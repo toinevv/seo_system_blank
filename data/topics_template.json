@@ -1,0 +1,145 @@
+{
+  "topics": [
+    {
+      "id": "getting-started-001",
+      "title": "Complete Beginner's Guide to [YOUR PRODUCT/SERVICE]",
+      "category": "getting_started",
+      "keywords": [
+        "[main keyword]",
+        "beginner guide",
+        "getting started",
+        "[your industry] basics"
+      ],
+      "priority": 10,
+      "difficulty": "basis",
+      "target_audience": "beginners",
+      "business_value": "high"
+    },
+    {
+      "id": "howto-001",
+      "title": "How to [Achieve Result] in 5 Simple Steps",
+      "category": "tutorials",
+      "keywords": [
+        "how to [achieve result]",
+        "[your product] tutorial",
+        "step by step guide"
+      ],
+      "priority": 9,
+      "difficulty": "basis",
+      "target_audience": "new users",
+      "business_value": "high"
+    },
+    {
+      "id": "benefits-001",
+      "title": "Top 10 Benefits of [YOUR SOLUTION]",
+      "category": "benefits",
+      "keywords": [
+        "[solution] benefits",
+        "why use [product]",
+        "[product] advantages"
+      ],
+      "priority": 9,
+      "difficulty": "basis",
+      "target_audience": "prospects",
+      "business_value": "high"
+    },
+    {
+      "id": "comparison-001",
+      "title": "[YOUR SOLUTION] vs [COMPETITOR/ALTERNATIVE]: Complete Comparison",
+      "category": "comparisons",
+      "keywords": [
+        "[product] vs [alternative]",
+        "[product] comparison",
+        "best [category] solution"
+      ],
+      "priority": 8,
+      "difficulty": "medium",
+      "target_audience": "decision makers",
+      "business_value": "high"
+    },
+    {
+      "id": "problems-001",
+      "title": "Hidden Costs of [PROBLEM]: What You Need to Know",
+      "category": "problem_awareness",
+      "keywords": [
+        "hidden [problem] costs",
+        "[problem] impact",
+        "[industry] challenges"
+      ],
+      "priority": 8,
+      "difficulty": "basis",
+      "target_audience": "business owners",
+      "business_value": "high"
+    },
+    {
+      "id": "advanced-001",
+      "title": "Advanced [TECHNIQUE/FEATURE]: Expert Tips",
+      "category": "advanced",
+      "keywords": [
+        "advanced [technique]",
+        "[product] expert tips",
+        "[feature] optimization"
+      ],
+      "priority": 6,
+      "difficulty": "advanced",
+      "target_audience": "power users",
+      "business_value": "medium"
+    },
+    {
+      "id": "casestudy-001",
+      "title": "Case Study: How [COMPANY] Achieved [RESULT] with [YOUR SOLUTION]",
+      "category": "case_studies",
+      "keywords": [
+        "[your product] success story",
+        "[result] case study",
+        "[industry] results"
+      ],
+      "priority": 7,
+      "difficulty": "basis",
+      "target_audience": "prospects",
+      "business_value": "high"
+    },
+    {
+      "id": "roi-001",
+      "title": "ROI Calculator: What [YOUR SOLUTION] Can Save You",
+      "category": "roi",
+      "keywords": [
+        "[product] ROI",
+        "[solution] cost savings",
+        "[problem] costs"
+      ],
+      "priority": 9,
+      "difficulty": "basis",
+      "target_audience": "CFOs, decision makers",
+      "business_value": "high"
+    },
+    {
+      "id": "trends-001",
+      "title": "[INDUSTRY] Trends 2025: What You Need to Know",
+      "category": "industry_trends",
+      "keywords": [
+        "[industry] trends 2025",
+        "future of [industry]",
+        "[category] predictions"
+      ],
+      "priority": 7,
+      "difficulty": "medium",
+      "target_audience": "industry professionals",
+      "business_value": "medium"
+    },
+    {
+      "id": "mistakes-001",
+      "title": "10 Common Mistakes When [DOING TASK] (And How to Avoid Them)",
+      "category": "best_practices",
+      "keywords": [
+        "[task] mistakes",
+        "avoid [problem]",
+        "[task] best practices"
+      ],
+      "priority": 8,
+      "difficulty": "basis",
+      "target_audience": "beginners, intermediate",
+      "business_value": "medium"
+    }
+  ]
+}

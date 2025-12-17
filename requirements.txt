@@ -1,0 +1,24 @@
+# Core AI APIs
+openai==1.12.0
+anthropic==0.18.1
+
+# Database
+supabase==2.7.4
+
+# Configuration
+python-dotenv==1.0.0
+pydantic==2.6.1
+pydantic-settings==2.2.1
+
+# Content Processing
+python-slugify==8.0.4
+langdetect==1.0.9
+
+# Networking & Async
+aiohttp==3.9.3
+asyncio==3.4.3
+tenacity==8.2.3
+
+# Utilities
+loguru==0.7.2
+pytz==2025.2
