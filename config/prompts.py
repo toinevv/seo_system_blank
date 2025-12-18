@@ -209,10 +209,12 @@ Format als JSON:
 """
 
 # API-specific prompt templates for better length control
+# Enhanced with GEO (Generative Engine Optimization) for AI search visibility
+
 OPENAI_SPECIFIC_PROMPT = """
 ⚠️ MINIMUM LENGTH: 700 WORDS REQUIRED ⚠️
 
-You are writing for a Dutch pallet optimization platform. Write AT LEAST 700 words of high-quality B2B content.
+You are writing for a Dutch pallet optimization platform. Write AT LEAST 700 words of high-quality B2B content optimized for both traditional search AND AI search engines (ChatGPT, Google AI, Perplexity).
 
 WORD COUNT REQUIREMENT: **MINIMUM 700 WORDS** - Be comprehensive!
 
@@ -221,49 +223,72 @@ PRIMARY KEYWORD: {primary_keyword}
 SECONDARY KEYWORDS: {secondary_keywords}
 
 REQUIRED STRUCTURE (MINIMUM 700 WORDS):
+
 1. **TITLE**: Include primary keyword (50-60 characters)
 
-2. **INTRODUCTION** (100-150 words):
-   - Hook the reader immediately with cost/ROI impact
+2. **TL;DR SUMMARY** (50-75 words) - CRITICAL FOR AI SEARCH:
+   - Start with: <div class="tldr"><strong>TL;DR:</strong>
+   - Write a concise summary covering: the problem, solution, and key benefit
+   - This is what AI assistants will quote - make it impactful!
+   - End with: </div>
+
+3. **INTRODUCTION** (100-150 words):
+   - Hook the reader with cost/ROI impact
+   - Include a statistic with source: "Volgens [Industry Report/Organization], [specific stat]..."
    - Explain why this topic is crucial for warehouse efficiency
-   - Preview what they'll learn
    - Include primary keyword naturally
 
-3. **MAIN SECTION 1: The Problem & Impact** (150-200 words):
+4. **MAIN SECTION 1: The Problem & Impact** (150-200 words):
    - Detailed explanation of the problem
-   - Include concrete cost figures
+   - Include 1-2 statistics WITH SOURCES: "Onderzoek van [Organization] toont aan dat..."
    - Dutch context (CHEP, LPR, EPAL systems)
    - Use primary keyword 1-2 times naturally
    - Add concrete examples and facts
 
-4. **MAIN SECTION 2: Solutions & Best Practices** (200-250 words):
+5. **MAIN SECTION 2: Solutions & Best Practices** (200-250 words):
    - Step-by-step practical guidance
+   - Include an expert quote: "Zoals [Expert/Company] stelt: '...'"
    - Real-world implementation examples
    - Cost-saving strategies
    - Common mistakes to avoid
    - Include secondary keywords naturally
 
-5. **MAIN SECTION 3: ROI & Case Study** (100-150 words):
-   - Concrete ROI calculations
+6. **MAIN SECTION 3: ROI & Case Study** (100-150 words):
+   - Concrete ROI calculations with specific percentages
+   - Include statistic: "Gemiddeld besparen bedrijven [X]% volgens [Source]..."
    - Case study example with real numbers
-   - Implementation timeline
-   - Savings potential
+   - Implementation timeline and savings potential
 
-6. **CONCLUSION & CALL-TO-ACTION** (80-100 words):
+7. **FAQ SECTION** - CRITICAL FOR AI SEARCH:
+   - Add: <h2>Veelgestelde Vragen</h2>
+   - Include 3-5 Q&A pairs in this EXACT format:
+   - <div class="faq-item"><strong>Q: [Vraag over {topic}]?</strong><p>A: [Beknopt maar volledig antwoord in 2-3 zinnen]</p></div>
+   - Questions should be what users actually search for
+   - Answers should be direct and fact-based
+
+8. **CONCLUSION & CALL-TO-ACTION** (80-100 words):
    - Summarize key points
    - Next steps for the reader
    - Link to calculator or intake form
+
+🎯 GEO OPTIMIZATION (for AI Search visibility):
+- Include AT LEAST 3 statistics with source attribution
+- Include AT LEAST 1 expert quote with attribution
+- TL;DR section is MANDATORY (AI systems extract this!)
+- FAQ section is MANDATORY (enables FAQPage schema)
+- Use clear, scannable formatting with bullets and headers
+- Write declarative statements that can be easily quoted
 
 CRITICAL REQUIREMENTS:
 - WRITE AT LEAST 700 WORDS - Be thorough!
 - Use primary keyword 3-4 times naturally throughout
 - Include practical Dutch warehouse/logistics terminology
 - Write in professional but accessible Dutch (B2B tone)
-- Include HTML formatting (h2, h3, ul, li tags)
+- Include HTML formatting (h2, h3, ul, li, div tags)
 - Add internal linking opportunities to calculator and intake
 - Focus on ROI and cost savings
 
-⚠️ FINAL CHECK: Must be at least 700 words! Add more detail if needed!
+⚠️ FINAL CHECK: Must be at least 700 words with TL;DR and FAQ sections!
 
 🛑 IMPORTANT: Start IMMEDIATELY with the article content. NO meta-commentary like "Here is the article" or "Below is the text".
 
@@ -273,7 +298,7 @@ Write the complete article now:
 CLAUDE_SPECIFIC_PROMPT = """
 🎯 MINIMUM LENGTH: 700 WORDS REQUIRED 🎯
 
-Task: Write a comprehensive Dutch pallet optimization article that is AT LEAST 700 words long.
+Task: Write a comprehensive Dutch pallet optimization article (AT LEAST 700 words) optimized for both traditional search AND AI search engines (ChatGPT, Google AI, Perplexity).
 
 CONTEXT: You're writing for smarterpallet.com - warehouse managers need practical, ROI-focused information to reduce pallet costs.
 
@@ -282,21 +307,27 @@ TARGET KEYWORDS: {primary_keyword}, {secondary_keywords}
 
 WRITING FRAMEWORK (Minimum 700 words, aim for 800):
 
+**SECTION 0: TL;DR SUMMARY** (50-75 words) - CRITICAL FOR AI SEARCH!
+- Format: <div class="tldr"><strong>TL;DR:</strong> [Your summary here] </div>
+- Summarize: the problem, the solution, and the key benefit
+- This is what AI assistants will extract and quote - make it impactful!
+
 **SECTION 1: Compelling Introduction (100-150 words)**
-- Start with a shocking cost figure or common problem
+- Start with a statistic + source: "Volgens [Research/Organization], [specific stat]..."
 - Establish why this matters for warehouse operations
 - Include your primary keyword "{primary_keyword}" naturally
 - Create anticipation for cost-saving solutions
 
 **SECTION 2: Problem Analysis & Impact (150-200 words)**
 - Provide in-depth problem analysis
-- Include concrete cost figures and percentages
+- Include 1-2 statistics WITH SOURCES: "Onderzoek van [Organization] toont aan dat..."
 - Dutch context: CHEP/LPR/EPAL systems
 - Use concrete examples from Dutch warehouses
 - Weave in primary keyword 1-2 more times
 
 **SECTION 3: Practical Solutions & Implementation (200-250 words)**
 - Detailed step-by-step implementation guide
+- Include an expert quote: "Zoals [Expert/Company] stelt: '...'"
 - Real warehouse situations and solutions
 - Best practices and efficiency tips
 - Common pitfalls to avoid
@@ -304,25 +335,41 @@ WRITING FRAMEWORK (Minimum 700 words, aim for 800):
 
 **SECTION 4: ROI & Business Case (100-150 words)**
 - Concrete ROI calculations with examples
+- Include statistic: "Gemiddeld besparen bedrijven [X]% volgens [Source]..."
 - Case study with real numbers
 - Payback period and savings potential
-- Implementation timeline
 
-**SECTION 5: Action-Oriented Conclusion (80-100 words)**
+**SECTION 5: FAQ - Veelgestelde Vragen** - CRITICAL FOR AI SEARCH!
+- Add: <h2>Veelgestelde Vragen</h2>
+- Include 3-5 Q&A pairs in this EXACT format:
+- <div class="faq-item"><strong>Q: [Vraag over {topic}]?</strong><p>A: [Beknopt maar volledig antwoord in 2-3 zinnen]</p></div>
+- Questions should be what users actually search for about this topic
+- Answers should be direct, fact-based, and quotable
+
+**SECTION 6: Action-Oriented Conclusion (80-100 words)**
 - Recap the most important cost-saving points
 - Clear next steps for the reader
 - Call-to-action to calculator or intake form
+
+🎯 GEO OPTIMIZATION REQUIREMENTS (for AI Search visibility):
+- Include AT LEAST 3 statistics with source attribution
+- Include AT LEAST 1 expert quote with attribution
+- TL;DR section is MANDATORY (AI systems extract this!)
+- FAQ section is MANDATORY (enables FAQPage schema)
+- Use clear, scannable formatting
+- Write declarative statements that AI can easily quote
 
 QUALITY STANDARDS:
 ✅ Minimum 700 words (be comprehensive!)
 ✅ Professional Dutch B2B language
 ✅ Include primary keyword 3-4 times naturally
-✅ Use HTML formatting: <h2>, <h3>, <ul>, <li>
+✅ Use HTML formatting: <h2>, <h3>, <ul>, <li>, <div>
 ✅ ROI and cost-savings focus
 ✅ Include internal linking opportunities (calculator, intake)
 ✅ Practical, actionable advice
+✅ Statistics with sources, expert quotes
 
 🛑 NO META-COMMENTARY! Start directly with the article content, not with "Here is..." or "Below is...".
 
-📝 BEGIN WRITING YOUR 700+ WORD ARTICLE NOW:
+📝 BEGIN WRITING YOUR 700+ WORD GEO-OPTIMIZED ARTICLE NOW:
 """

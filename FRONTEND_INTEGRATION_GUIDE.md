@@ -71,6 +71,25 @@ export type BlogArticle = {
   seo_score?: number
   product_id: string
   website_domain: string
+
+  // GEO (Generative Engine Optimization) Fields
+  // For AI search visibility (ChatGPT, Google AI, Perplexity)
+  tldr?: string                    // TL;DR summary for AI extraction
+  faq_items?: Array<{              // FAQ Q&A pairs
+    question: string
+    answer: string
+  }>
+  faq_schema?: any                 // Pre-generated FAQPage schema
+  cited_statistics?: Array<{       // Statistics with sources
+    statistic: string
+    source: string
+  }>
+  citations?: Array<{              // Expert quotes
+    quote: string
+    source: string
+    type?: string
+  }>
+  geo_optimized?: boolean          // GEO optimization flag
 }
 ```
 
@@ -259,6 +278,8 @@ export default function BlogList({ posts }: { posts: BlogArticle[] }) {
 import { format } from 'date-fns'
 import { nl } from 'date-fns/locale'
 import type { BlogArticle } from '@/lib/supabase'
+import TLDRSection from './TLDRSection'
+import FAQSection from './FAQSection'
 
 export default function BlogPost({ post }: { post: BlogArticle }) {
   return (
@@ -285,6 +306,9 @@ export default function BlogPost({ post }: { post: BlogArticle }) {
         </p>
       </header>
 
+      {/* TL;DR Section - GEO Optimization for AI Search */}
+      <TLDRSection tldr={post.tldr} />
+
       {post.cover_image_url && (
         <img
           src={post.cover_image_url}
@@ -297,6 +321,9 @@ export default function BlogPost({ post }: { post: BlogArticle }) {
         className="prose prose-lg max-w-none prose-headings:text-primary prose-a:text-secondary"
         dangerouslySetInnerHTML={{ __html: post.content }}
       />
+
+      {/* FAQ Section - GEO Optimization for AI Search */}
+      <FAQSection faqItems={post.faq_items} />
 
       {post.tags && post.tags.length > 0 && (
         <footer className="mt-12 pt-8 border-t">
@@ -316,6 +343,8 @@ export default function BlogPost({ post }: { post: BlogArticle }) {
   )
 }
 ```
+
+**🤖 GEO Note**: The `TLDRSection` and `FAQSection` components are critical for AI search visibility. AI systems like ChatGPT extract the TL;DR for quick answers, and the FAQ section enables FAQPage schema which can boost visibility by 35-40%.
 
 ### RelatedPosts.tsx
 ```typescript
@@ -361,12 +390,75 @@ import type { BlogArticle } from '@/lib/supabase'
 
 export default function BlogSchema({ article }: { article: BlogArticle }) {
   return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{
-        __html: JSON.stringify(article.schema_markup),
-      }}
-    />
+    <>
+      {/* Main Article Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(article.schema_markup),
+        }}
+      />
+
+      {/* FAQPage Schema for GEO (AI Search Optimization) */}
+      {article.faq_schema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(article.faq_schema),
+          }}
+        />
+      )}
+    </>
+  )
+}
+```
+
+### TLDRSection.tsx (GEO Component)
+```typescript
+// TL;DR section for AI search optimization
+// AI systems like ChatGPT extract this for quick answers
+export default function TLDRSection({ tldr }: { tldr?: string }) {
+  if (!tldr) return null
+
+  return (
+    <div className="tldr bg-blue-50 border-l-4 border-blue-500 p-4 mb-8 rounded-r">
+      <div className="flex items-start gap-2">
+        <span className="text-blue-600 font-bold">TL;DR:</span>
+        <p className="text-gray-700">{tldr}</p>
+      </div>
+    </div>
+  )
+}
+```
+
+### FAQSection.tsx (GEO Component)
+```typescript
+import type { BlogArticle } from '@/lib/supabase'
+
+// FAQ Section for AI search optimization
+// Enables FAQPage schema for rich results in Google & AI search
+export default function FAQSection({ faqItems }: { faqItems?: BlogArticle['faq_items'] }) {
+  if (!faqItems || faqItems.length === 0) return null
+
+  return (
+    <section className="faq-section mt-12 pt-8 border-t">
+      <h2 className="text-2xl font-bold text-primary mb-6">
+        Veelgestelde Vragen
+      </h2>
+      <div className="space-y-4">
+        {faqItems.map((item, index) => (
+          <div
+            key={index}
+            className="faq-item bg-gray-50 p-4 rounded-lg"
+          >
+            <h3 className="font-semibold text-lg text-primary">
+              {item.question}
+            </h3>
+            <p className="text-gray-700 mt-2">{item.answer}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 ```
@@ -567,6 +659,105 @@ export default function robots(): MetadataRoute.Robots {
 
 ---
 
+## 🤖 **GEO (Generative Engine Optimization)**
+
+GEO optimizes content for AI search engines like ChatGPT, Google AI Overviews, and Perplexity. Research shows specific content structures increase AI citation rates by 35-40%.
+
+### What is GEO?
+
+Traditional SEO optimizes for Google's search algorithm. GEO optimizes for **AI systems that synthesize answers** from multiple sources. When users ask ChatGPT or use Google AI Overviews, these systems:
+
+1. **Extract key facts** from content (TL;DR sections are ideal)
+2. **Look for Q&A patterns** (FAQ sections get cited frequently)
+3. **Prefer cited statistics** (adds credibility/trust signals)
+4. **Value expert quotes** (authority signals)
+
+### GEO Database Fields
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `tldr` | `TEXT` | 50-75 word summary at article top - AI systems extract this for quick answers |
+| `faq_items` | `JSONB` | Array of Q&A pairs: `[{question, answer}]` - enables FAQPage schema |
+| `faq_schema` | `JSONB` | Pre-generated FAQPage JSON-LD schema markup |
+| `cited_statistics` | `JSONB` | Statistics with sources: `[{statistic, source}]` |
+| `citations` | `JSONB` | Expert quotes: `[{quote, source, type}]` |
+| `geo_optimized` | `BOOLEAN` | Flag indicating article has GEO optimization applied |
+
+### GEO Components
+
+The following components handle GEO rendering:
+
+#### TLDRSection.tsx
+```typescript
+// Renders the TL;DR summary at the top of articles
+// AI systems prioritize extracting content from clearly marked summaries
+<TLDRSection tldr={post.tldr} />
+```
+
+#### FAQSection.tsx
+```typescript
+// Renders FAQ Q&A pairs at the bottom of articles
+// Combined with FAQPage schema for rich results
+<FAQSection faqItems={post.faq_items} />
+```
+
+#### BlogSchema.tsx (with FAQPage)
+```typescript
+// Outputs both Article schema AND FAQPage schema
+{article.faq_schema && (
+  <script type="application/ld+json">
+    {JSON.stringify(article.faq_schema)}
+  </script>
+)}
+```
+
+### FAQPage Schema Structure
+
+The `faq_schema` field contains pre-generated JSON-LD:
+
+```json
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is the question?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "This is the answer..."
+      }
+    }
+  ]
+}
+```
+
+### GEO Impact on SEO Score
+
+The backend calculates SEO scores with GEO factors (35 points out of 100):
+
+| Factor | Points |
+|--------|--------|
+| TL;DR present | +8 |
+| FAQ section (3+ items) | +10 |
+| Statistics with sources (3+) | +10 |
+| Citations/quotes (2+) | +7 |
+
+### Testing GEO Implementation
+
+1. **Check schema markup**: View page source, search for `"@type": "FAQPage"`
+2. **Validate with Google**: [Rich Results Test](https://search.google.com/test/rich-results)
+3. **Query in SQL**:
+   ```sql
+   SELECT title, geo_optimized,
+          jsonb_array_length(faq_items) as faq_count,
+          tldr IS NOT NULL as has_tldr
+   FROM blog_articles
+   WHERE product_id = 'yourproduct' AND geo_optimized = true;
+   ```
+
+---
+
 ## 🎨 **Styling Tips**
 
 ### Using Tailwind CSS Classes
@@ -631,18 +822,28 @@ Update your navigation component:
 
 After setup, verify:
 
+### Core Functionality
 - [ ] `/blog` loads without errors
 - [ ] Blog cards display correctly
 - [ ] `/blog/[slug]` pages load
 - [ ] Related posts show up
-- [ ] `https://yourdomain.com/sitemap.xml` is accessible
-- [ ] `https://yourdomain.com/robots.txt` is accessible
-- [ ] Meta tags appear in page source (View Source)
-- [ ] Schema markup validates ([Google Rich Results Test](https://search.google.com/test/rich-results))
 - [ ] Images load (if you have cover images)
 - [ ] Date formatting is correct
 - [ ] Links work correctly
 - [ ] Mobile responsive
+
+### SEO & Indexing
+- [ ] `https://yourdomain.com/sitemap.xml` is accessible
+- [ ] `https://yourdomain.com/robots.txt` is accessible
+- [ ] Meta tags appear in page source (View Source)
+- [ ] Schema markup validates ([Google Rich Results Test](https://search.google.com/test/rich-results))
+
+### GEO (AI Search Optimization)
+- [ ] TL;DR section displays at top of article (if `tldr` field present)
+- [ ] FAQ section displays at bottom of article (if `faq_items` present)
+- [ ] FAQPage schema is in page source (check for `"@type": "FAQPage"`)
+- [ ] Schema validates with FAQPage ([Google Rich Results Test](https://search.google.com/test/rich-results))
+- [ ] `geo_optimized` flag is `true` on articles with GEO content
 
 ---
 
@@ -787,6 +988,9 @@ const categories = await getCategories()
 - [Tailwind CSS Docs](https://tailwindcss.com/docs)
 - [date-fns Documentation](https://date-fns.org/docs)
 - [Schema.org Markup](https://schema.org/Article)
+- [Schema.org FAQPage](https://schema.org/FAQPage) - For GEO optimization
+- [Google Rich Results Test](https://search.google.com/test/rich-results) - Validate schema markup
+- [GEO Research Paper](https://arxiv.org/abs/2311.09735) - Original Princeton/Georgia Tech research
 
 ---
 
@@ -805,6 +1009,7 @@ Before deploying, change:
 ---
 
 **Created**: 2025-01-15
-**System**: Multi-Product Blog Integration
-**Version**: 1.0.0
+**Updated**: 2025-12-18
+**System**: Multi-Product Blog Integration with GEO
+**Version**: 2.0.0 (GEO-enabled)
 

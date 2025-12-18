@@ -16,7 +16,7 @@ import openai
 import anthropic
 from slugify import slugify
 
-from config.settings import Settings, API_CONFIG, QA_REQUIREMENTS, ERROR_HANDLING
+from config.settings import Settings, API_CONFIG, QA_REQUIREMENTS, ERROR_HANDLING, GEO_CONFIG
 from config.prompts import (
     BLOG_PROMPT_TEMPLATE,
     TITLE_GENERATION_PROMPT,
@@ -270,6 +270,9 @@ class ContentGenerator:
         # Extract or generate excerpt
         excerpt = self._generate_excerpt(cleaned_content)
         
+        # Extract GEO elements for AI search optimization
+        geo_elements = self._extract_geo_elements(cleaned_content)
+
         return {
             "title": title,
             "slug": slug,
@@ -284,7 +287,13 @@ class ContentGenerator:
             "read_time": reading_time,
             "language": "nl-NL",
             "author": "SmarterPallet Expert",
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
+            # GEO (Generative Engine Optimization) fields
+            "tldr": geo_elements.get("tldr"),
+            "faq_items": geo_elements.get("faq_items", []),
+            "cited_statistics": geo_elements.get("cited_statistics", []),
+            "citations": geo_elements.get("citations", []),
+            "geo_optimized": geo_elements.get("geo_optimized", False)
         }
     
     def _extract_title(self, content: str, topic: Dict) -> str:
@@ -377,16 +386,171 @@ class ContentGenerator:
         """Generate excerpt from content"""
         # Remove HTML tags
         text_content = re.sub(r'<[^>]+>', '', content)
-        
+
         # Get first paragraph or first 160 characters
         paragraphs = text_content.split('\n\n')
         first_paragraph = paragraphs[0] if paragraphs else text_content
-        
+
         if len(first_paragraph) <= 160:
             return first_paragraph.strip()
         else:
             return first_paragraph[:160].rsplit(' ', 1)[0] + '...'
-    
+
+    # ==========================================================================
+    # GEO (Generative Engine Optimization) Extraction Functions
+    # For AI search visibility in ChatGPT, Google AI, Perplexity
+    # ==========================================================================
+
+    def _extract_geo_elements(self, content: str) -> Dict:
+        """Extract all GEO elements from generated content"""
+        return {
+            "tldr": self._extract_tldr(content),
+            "faq_items": self._extract_faq_items(content),
+            "cited_statistics": self._extract_statistics(content),
+            "citations": self._extract_citations(content),
+            "geo_optimized": True
+        }
+
+    def _extract_tldr(self, content: str) -> Optional[str]:
+        """Extract TL;DR summary from content"""
+        # Pattern 1: Look for TL;DR in div
+        tldr_div_match = re.search(
+            r'<div[^>]*class="tldr"[^>]*>.*?<strong>TL;DR:</strong>\s*(.*?)</div>',
+            content, re.IGNORECASE | re.DOTALL
+        )
+        if tldr_div_match:
+            tldr = re.sub(r'<[^>]+>', '', tldr_div_match.group(1)).strip()
+            return tldr
+
+        # Pattern 2: Look for TL;DR: header
+        tldr_match = re.search(
+            r'(?:TL;DR|TLDR)[:\s]+(.+?)(?=<h2|<h3|\n\n|$)',
+            content, re.IGNORECASE | re.DOTALL
+        )
+        if tldr_match:
+            tldr = re.sub(r'<[^>]+>', '', tldr_match.group(1)).strip()
+            # Limit to ~75 words
+            words = tldr.split()
+            if len(words) > 80:
+                tldr = ' '.join(words[:75]) + '...'
+            return tldr
+
+        return None
+
+    def _extract_faq_items(self, content: str) -> List[Dict]:
+        """Extract FAQ Q&A pairs from content"""
+        faq_items = []
+
+        # Pattern 1: Look for faq-item divs with Q:/A: format
+        faq_div_pattern = re.compile(
+            r'<div[^>]*class="faq-item"[^>]*>.*?<strong>Q:\s*(.+?)\?*</strong>.*?(?:<p>)?A:\s*(.+?)(?:</p>)?</div>',
+            re.IGNORECASE | re.DOTALL
+        )
+        for match in faq_div_pattern.finditer(content):
+            question = re.sub(r'<[^>]+>', '', match.group(1)).strip()
+            answer = re.sub(r'<[^>]+>', '', match.group(2)).strip()
+            if question and answer:
+                faq_items.append({
+                    "question": question + "?" if not question.endswith("?") else question,
+                    "answer": answer
+                })
+
+        # Pattern 2: Look for Q: A: format without div wrapper
+        if not faq_items:
+            qa_pattern = re.compile(
+                r'(?:Q:|Vraag:)\s*(.+?)\??\s*(?:A:|Antwoord:)\s*(.+?)(?=Q:|Vraag:|<h|$)',
+                re.IGNORECASE | re.DOTALL
+            )
+            for match in qa_pattern.finditer(content):
+                question = re.sub(r'<[^>]+>', '', match.group(1)).strip()
+                answer = re.sub(r'<[^>]+>', '', match.group(2)).strip()
+                if question and answer and len(answer) > 20:
+                    faq_items.append({
+                        "question": question + "?" if not question.endswith("?") else question,
+                        "answer": answer[:500]  # Limit answer length
+                    })
+
+        # Limit to configured max FAQ items
+        max_faq = GEO_CONFIG.get("faq_count", {}).get("max", 5)
+        return faq_items[:max_faq]
+
+    def _extract_statistics(self, content: str) -> List[Dict]:
+        """Extract statistics with source attribution from content"""
+        statistics = []
+        text_content = re.sub(r'<[^>]+>', '', content)
+
+        # Patterns for statistics with sources
+        stat_patterns = [
+            # "Volgens [Source], X%" or "According to [Source], X%"
+            r'(?:Volgens|According to)\s+([^,]+?),?\s+(.+?(?:\d+[%€$]|\d+\s*(?:procent|percent|miljoen|billion)).+?)(?:\.|$)',
+            # "Onderzoek van [Source] toont aan dat..."
+            r'(?:Onderzoek|Research|Study)\s+(?:van|by|from)\s+([^,]+?)\s+(?:toont aan|shows|indicates)\s+(?:dat\s+)?(.+?(?:\d+[%€$]|\d+\s*(?:procent|percent)).+?)(?:\.|$)',
+            # "[X]% volgens [Source]"
+            r'(\d+[%€$].+?)\s+(?:volgens|according to|per)\s+([^,\.]+)',
+            # "Gemiddeld [stat] volgens [Source]"
+            r'(?:Gemiddeld|On average|Average)\s+(.+?(?:\d+[%€$]).+?)\s+(?:volgens|according to)\s+([^,\.]+)',
+        ]
+
+        for pattern in stat_patterns:
+            matches = re.findall(pattern, text_content, re.IGNORECASE)
+            for match in matches:
+                if len(match) >= 2:
+                    # Determine which is source and which is statistic
+                    if re.search(r'\d+[%€$]|\d+\s*(?:procent|percent)', match[0]):
+                        stat, source = match[0], match[1]
+                    else:
+                        source, stat = match[0], match[1]
+
+                    statistics.append({
+                        "statistic": stat.strip()[:200],
+                        "source": source.strip()[:100]
+                    })
+
+        # Deduplicate and limit
+        seen = set()
+        unique_stats = []
+        for stat in statistics:
+            key = stat["statistic"][:50]
+            if key not in seen:
+                seen.add(key)
+                unique_stats.append(stat)
+
+        return unique_stats[:10]  # Limit to 10 statistics
+
+    def _extract_citations(self, content: str) -> List[Dict]:
+        """Extract expert quotes and citations from content"""
+        citations = []
+        text_content = re.sub(r'<[^>]+>', '', content)
+
+        # Patterns for expert quotes
+        quote_patterns = [
+            # "Zoals [Expert/Company] stelt: '...'"
+            r'(?:Zoals|As)\s+([^,]+?)\s+(?:stelt|states|notes|says)[:\s]+["\'](.+?)["\']',
+            # "[Expert] says: '...'"
+            r'([A-Z][^,]+?)\s+(?:zegt|says|notes|explains)[:\s]+["\'](.+?)["\']',
+            # Quote in quotes with attribution after
+            r'["\']([^"\']+)["\'](?:\s*[-–—]\s*|\s+aldus\s+|\s+according to\s+)([^,\.]+)',
+        ]
+
+        for pattern in quote_patterns:
+            matches = re.findall(pattern, text_content, re.IGNORECASE)
+            for match in matches:
+                if len(match) >= 2:
+                    # Determine order based on pattern
+                    if len(match[0]) > len(match[1]) and len(match[0]) > 20:
+                        quote, source = match[0], match[1]
+                    else:
+                        source, quote = match[0], match[1]
+
+                    if len(quote) > 20:  # Only include substantial quotes
+                        citations.append({
+                            "quote": quote.strip()[:300],
+                            "source": source.strip()[:100],
+                            "type": "expert_quote"
+                        })
+
+        return citations[:5]  # Limit to 5 citations
+
     def _passes_qa_check(self, article: Dict) -> bool:
         """Check if article meets quality requirements"""
         content = article["content"]

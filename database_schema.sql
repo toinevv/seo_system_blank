@@ -52,6 +52,15 @@ CREATE TABLE IF NOT EXISTS public.blog_articles (
     geo_targeting TEXT[] DEFAULT ARRAY['Nederland', 'België'],
     language TEXT DEFAULT 'nl-NL',
 
+    -- GEO (Generative Engine Optimization) Fields
+    -- For AI search visibility (ChatGPT, Google AI, Perplexity)
+    tldr TEXT,  -- TL;DR summary for AI extraction (50-75 words)
+    faq_items JSONB DEFAULT '[]'::JSONB,  -- FAQ Q&A pairs for FAQPage schema
+    cited_statistics JSONB DEFAULT '[]'::JSONB,  -- Statistics with sources
+    citations JSONB DEFAULT '[]'::JSONB,  -- Expert quotes and citations
+    geo_optimized BOOLEAN DEFAULT FALSE,  -- Flag if GEO optimization applied
+    faq_schema JSONB DEFAULT '{}'::JSONB,  -- Pre-generated FAQPage schema
+
     -- Unique constraint: slug must be unique per product
     CONSTRAINT blog_articles_slug_product_unique UNIQUE(slug, product_id)
 );
@@ -108,6 +117,16 @@ SELECT
 FROM information_schema.columns
 WHERE table_schema = 'public' AND table_name = 'blog_articles'
 ORDER BY ordinal_position;
+
+-- ============================================================================
+-- GEO MIGRATION: Run this if you have an existing database without GEO fields
+-- ============================================================================
+-- ALTER TABLE public.blog_articles ADD COLUMN IF NOT EXISTS tldr TEXT;
+-- ALTER TABLE public.blog_articles ADD COLUMN IF NOT EXISTS faq_items JSONB DEFAULT '[]'::JSONB;
+-- ALTER TABLE public.blog_articles ADD COLUMN IF NOT EXISTS cited_statistics JSONB DEFAULT '[]'::JSONB;
+-- ALTER TABLE public.blog_articles ADD COLUMN IF NOT EXISTS citations JSONB DEFAULT '[]'::JSONB;
+-- ALTER TABLE public.blog_articles ADD COLUMN IF NOT EXISTS geo_optimized BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE public.blog_articles ADD COLUMN IF NOT EXISTS faq_schema JSONB DEFAULT '{}'::JSONB;
 
 -- Test insert (optional - will be done by Python backend)
 -- INSERT INTO public.blog_articles (

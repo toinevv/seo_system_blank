@@ -11,7 +11,7 @@ from urllib.parse import quote
 from loguru import logger
 from bs4 import BeautifulSoup
 
-from config.settings import SEO_CONFIG
+from config.settings import SEO_CONFIG, GEO_CONFIG
 
 
 class SEOOptimizer:
@@ -23,28 +23,35 @@ class SEOOptimizer:
     def optimize_article(self, article: Dict) -> Dict:
         """Perform comprehensive SEO optimization on article"""
         logger.info(f"Optimizing SEO for article: {article['title']}")
-        
+
         # Optimize title
         article["title"] = self.optimize_title(article["title"], article.get("primary_keyword", ""))
-        
+
         # Optimize meta description
         if not article.get("meta_description"):
             article["meta_description"] = self.generate_meta_description(article)
         else:
             article["meta_description"] = self.optimize_meta_description(article["meta_description"])
-        
+
         # Analyze keyword density
         article["keyword_analysis"] = self.analyze_keyword_density(article)
-        
-        # Generate schema markup
+
+        # Generate schema markup (Article + HowTo)
         article["schema_markup"] = self.generate_schema_markup(article)
-        
+
+        # Generate FAQPage schema (GEO optimization)
+        if GEO_CONFIG.get("enable_faq_schema", True) and article.get("faq_items"):
+            article["faq_schema"] = self.generate_faq_schema(article)
+            # Merge FAQ schema into main schema markup
+            if article["faq_schema"]:
+                article["schema_markup"]["faq"] = article["faq_schema"]
+
         # Generate internal linking suggestions
         article["internal_links"] = self.suggest_internal_links(article)
-        
-        # SEO score
+
+        # SEO score (includes GEO factors)
         article["seo_score"] = self.calculate_seo_score(article)
-        
+
         logger.info(f"SEO optimization complete. Score: {article['seo_score']}/100")
         return article
     
@@ -193,6 +200,9 @@ class SEOOptimizer:
             }
         }
 
+        # Enhance Article schema with GEO fields for AI search visibility
+        article_schema = self.enhance_article_schema_for_geo(article_schema, article)
+
         # Add HowTo schema for optimization/efficiency guides
         if category in ["optimalisatie", "warehouse_efficiency"] or "stappen" in article["content"].lower():
             howto_schema = {
@@ -215,7 +225,81 @@ class SEOOptimizer:
             }
 
         return {"article": article_schema}
-    
+
+    def generate_faq_schema(self, article: Dict) -> Optional[Dict]:
+        """Generate FAQPage schema markup for GEO optimization"""
+        faq_items = article.get("faq_items", [])
+
+        if not faq_items:
+            return None
+
+        # Build FAQPage schema
+        faq_schema = {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": []
+        }
+
+        for item in faq_items:
+            question = item.get("question", "")
+            answer = item.get("answer", "")
+
+            if question and answer:
+                faq_schema["mainEntity"].append({
+                    "@type": "Question",
+                    "name": question,
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": answer
+                    }
+                })
+
+        # Only return if we have at least one Q&A
+        if faq_schema["mainEntity"]:
+            logger.info(f"Generated FAQPage schema with {len(faq_schema['mainEntity'])} Q&A pairs")
+            return faq_schema
+
+        return None
+
+    def enhance_article_schema_for_geo(self, article_schema: Dict, article: Dict) -> Dict:
+        """Enhance Article schema with GEO-specific fields for AI search"""
+        # Add speakable property for voice assistants
+        if GEO_CONFIG.get("speakable_enabled", True):
+            article_schema["speakable"] = {
+                "@type": "SpeakableSpecification",
+                "cssSelector": [".tldr", "h1", "h2", ".faq-item"]
+            }
+
+        # Add about entities for better AI understanding
+        if GEO_CONFIG.get("include_about_entities", True):
+            article_schema["about"] = {
+                "@type": "Thing",
+                "name": article.get("primary_keyword", article["title"]),
+                "description": article.get("meta_description", "")
+            }
+
+        # Add citation references if available
+        citations = article.get("citations", [])
+        if citations:
+            article_schema["citation"] = [
+                {
+                    "@type": "CreativeWork",
+                    "name": cite.get("source", ""),
+                    "text": cite.get("quote", "")[:200]
+                }
+                for cite in citations[:5]
+            ]
+
+        # Add hasPart for FAQ section if present
+        if article.get("faq_items"):
+            article_schema["hasPart"] = {
+                "@type": "WebPageElement",
+                "name": "FAQ Section",
+                "cssSelector": ".faq-section"
+            }
+
+        return article_schema
+
     def suggest_internal_links(self, article: Dict) -> List[Dict]:
         """Suggest internal links for SmarterPallet"""
         content = article["content"].lower()
@@ -281,69 +365,120 @@ class SEOOptimizer:
         return suggestions[:5]
     
     def calculate_seo_score(self, article: Dict) -> int:
-        """Calculate overall SEO score (0-100)"""
+        """Calculate overall SEO score (0-100) including GEO factors"""
         score = 0
-        max_score = 100
-        
-        # Title optimization (20 points)
+
+        # ======================
+        # Traditional SEO Factors (65 points max)
+        # ======================
+
+        # Title optimization (15 points)
         title = article["title"]
         if 50 <= len(title) <= 60:
-            score += 20
-        elif 40 <= len(title) <= 70:
             score += 15
+        elif 40 <= len(title) <= 70:
+            score += 10
         else:
             score += 5
-        
+
         # Primary keyword in title (10 points)
         primary_keyword = article.get("primary_keyword", "").lower()
         if primary_keyword and primary_keyword in title.lower():
             score += 10
-        
-        # Meta description (15 points)
+
+        # Meta description (10 points)
         meta_desc = article.get("meta_description", "")
         if 150 <= len(meta_desc) <= 160:
-            score += 15
-        elif 120 <= len(meta_desc) <= 170:
             score += 10
+        elif 120 <= len(meta_desc) <= 170:
+            score += 7
         else:
-            score += 5
-        
-        # Content length (15 points)
+            score += 3
+
+        # Content length (10 points)
         word_count = article.get("keyword_analysis", {}).get("word_count", 0)
         if 1000 <= word_count <= 2000:
-            score += 15
-        elif 800 <= word_count <= 2500:
             score += 10
+        elif 800 <= word_count <= 2500:
+            score += 7
         else:
-            score += 5
-        
-        # Keyword density (15 points)
+            score += 3
+
+        # Keyword density (10 points)
         keyword_analysis = article.get("keyword_analysis", {})
         primary_density = keyword_analysis.get("primary_keyword", {}).get("density", 0)
         if 1 <= primary_density <= 2:
-            score += 15
-        elif 0.5 <= primary_density <= 3:
             score += 10
+        elif 0.5 <= primary_density <= 3:
+            score += 7
         else:
-            score += 5
-        
-        # Internal links (10 points)
+            score += 3
+
+        # Internal links (5 points)
         internal_links = article.get("internal_links", [])
         if 3 <= len(internal_links) <= 7:
-            score += 10
+            score += 5
         elif 1 <= len(internal_links) <= 10:
-            score += 5
-        
-        # Schema markup (10 points)
+            score += 3
+
+        # Schema markup (5 points)
         if article.get("schema_markup"):
-            score += 10
-        
-        # Reading time (5 points)
-        read_time = article.get("read_time", 0)
-        if 3 <= read_time <= 10:
             score += 5
-        
-        return min(score, max_score)
+
+        # ======================
+        # GEO Factors (35 points max)
+        # For AI Search visibility (ChatGPT, Google AI, Perplexity)
+        # ======================
+
+        # TL;DR presence (8 points) - Critical for AI extraction
+        tldr = article.get("tldr")
+        if tldr:
+            tldr_words = len(tldr.split())
+            if 40 <= tldr_words <= 80:
+                score += 8  # Perfect TL;DR length
+            elif 20 <= tldr_words <= 100:
+                score += 5  # Acceptable TL;DR
+            else:
+                score += 2  # TL;DR present but suboptimal
+
+        # FAQ section (10 points) - Enables FAQPage schema
+        faq_items = article.get("faq_items", [])
+        min_faq = GEO_CONFIG.get("faq_count", {}).get("min", 3)
+        if len(faq_items) >= min_faq:
+            score += 10  # Full points for meeting FAQ requirement
+        elif len(faq_items) >= 2:
+            score += 6  # Partial points
+        elif len(faq_items) >= 1:
+            score += 3  # Minimal FAQ
+
+        # Statistics with sources (10 points) - Trust signals for AI
+        cited_statistics = article.get("cited_statistics", [])
+        min_stats = GEO_CONFIG.get("min_statistics", 3)
+        if len(cited_statistics) >= min_stats:
+            score += 10  # Full points
+        elif len(cited_statistics) >= 2:
+            score += 6  # Partial
+        elif len(cited_statistics) >= 1:
+            score += 3  # Minimal
+
+        # Expert citations/quotes (7 points) - Authority signals
+        citations = article.get("citations", [])
+        min_citations = GEO_CONFIG.get("min_citations", 2)
+        if len(citations) >= min_citations:
+            score += 7
+        elif len(citations) >= 1:
+            score += 4
+
+        # Log GEO score breakdown
+        geo_score = 0
+        if tldr: geo_score += 8 if 40 <= len(tldr.split()) <= 80 else 5
+        if len(faq_items) >= min_faq: geo_score += 10
+        if len(cited_statistics) >= min_stats: geo_score += 10
+        if len(citations) >= min_citations: geo_score += 7
+
+        logger.info(f"GEO Score breakdown: TL;DR={bool(tldr)}, FAQ={len(faq_items)}, Stats={len(cited_statistics)}, Citations={len(citations)} -> {geo_score}/35 GEO points")
+
+        return min(score, 100)
     
     def _extract_text_content(self, html_content: str) -> str:
         """Extract plain text from HTML content"""

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.blog_articles (
     seo_score INTEGER DEFAULT 0,
     schema_markup JSONB,
     internal_links JSONB,
+    keyword_analysis JSONB,
 
     -- Media
     cover_image_url TEXT,
@@ -43,12 +44,25 @@ CREATE TABLE IF NOT EXISTS public.blog_articles (
     read_time INTEGER,
     word_count INTEGER,
     language TEXT DEFAULT 'nl-NL',
+    topic_id TEXT,
 
     -- Status & Timestamps
-    status TEXT DEFAULT 'draft',
-    published_at TIMESTAMP WITH TIME ZONE,
+    status TEXT DEFAULT 'published',
+    published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    -- Localization
+    geo_targeting TEXT[] DEFAULT ARRAY['Nederland', 'België'],
+
+    -- GEO (Generative Engine Optimization) Fields
+    -- For AI search visibility (ChatGPT, Google AI, Perplexity)
+    tldr TEXT,                                    -- TL;DR summary for AI extraction (50-75 words)
+    faq_items JSONB DEFAULT '[]'::JSONB,          -- FAQ Q&A pairs for FAQPage schema
+    cited_statistics JSONB DEFAULT '[]'::JSONB,   -- Statistics with sources
+    citations JSONB DEFAULT '[]'::JSONB,          -- Expert quotes and citations
+    geo_optimized BOOLEAN DEFAULT FALSE,          -- Flag if GEO optimization applied
+    faq_schema JSONB DEFAULT '{}'::JSONB,         -- Pre-generated FAQPage schema
 
     -- Analytics (optional, for future use)
     view_count INTEGER DEFAULT 0,
@@ -203,6 +217,25 @@ const { data } = await supabase
 | `product_id` | TEXT | Product identifier | ⭐⭐⭐⭐⭐ Critical | ✅ Yes |
 | `website_domain` | TEXT | Domain filter | ⭐⭐⭐ Medium | ✅ Yes |
 
+### GEO (Generative Engine Optimization) Fields
+
+These fields optimize content for AI search engines like ChatGPT, Google AI Overviews, and Perplexity.
+
+| Field | Type | Usage | GEO Impact | Required |
+|-------|------|-------|------------|----------|
+| `tldr` | TEXT | TL;DR summary (50-75 words) | ⭐⭐⭐⭐⭐ Critical | ✅ Yes |
+| `faq_items` | JSONB | FAQ Q&A pairs array | ⭐⭐⭐⭐⭐ Critical | ✅ Yes |
+| `faq_schema` | JSONB | Pre-generated FAQPage schema | ⭐⭐⭐⭐⭐ Critical | ✅ Yes |
+| `cited_statistics` | JSONB | Statistics with sources | ⭐⭐⭐⭐ High | ⚠️ Recommended |
+| `citations` | JSONB | Expert quotes/citations | ⭐⭐⭐⭐ High | ⚠️ Recommended |
+| `geo_optimized` | BOOLEAN | GEO optimization flag | ⭐⭐ Low | ❌ Optional |
+
+**Why GEO Fields Matter:**
+- AI systems like ChatGPT extract TL;DR sections for quick answers
+- FAQPage schema increases visibility in AI-generated responses by 35-40%
+- Cited statistics build trust signals that AI models reward
+- Expert quotes add authority signals for AI ranking
+
 ---
 
 ## 🚀 Optimal SEO Implementation
@@ -338,6 +371,84 @@ export default function BlogSchema({ article }: { article: BlogArticle }) {
     "relevance": 8
   }
 ]
+```
+
+### 4. GEO Elements (AI Search Optimization)
+
+#### TL;DR Display
+```typescript
+// Display TL;DR section prominently at top of article
+{article.tldr && (
+  <div className="tldr bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+    <strong className="text-blue-700">TL;DR:</strong>
+    <p className="text-gray-700 mt-1">{article.tldr}</p>
+  </div>
+)}
+```
+
+#### FAQ Section with Schema
+```typescript
+// Render FAQ items and include FAQPage schema
+{article.faq_items && article.faq_items.length > 0 && (
+  <>
+    {/* FAQPage Schema for AI Search */}
+    {article.faq_schema && (
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(article.faq_schema)
+        }}
+      />
+    )}
+
+    {/* Visual FAQ Section */}
+    <section className="faq-section mt-12">
+      <h2 className="text-2xl font-bold mb-6">Veelgestelde Vragen</h2>
+      <div className="space-y-4">
+        {article.faq_items.map((item, index) => (
+          <div key={index} className="faq-item bg-gray-50 p-4 rounded-lg">
+            <h3 className="font-semibold text-lg text-primary">
+              {item.question}
+            </h3>
+            <p className="text-gray-700 mt-2">{item.answer}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  </>
+)}
+```
+
+**Structure of `faq_items`:**
+```json
+[
+  {
+    "question": "Wat zijn verborgen palletkosten?",
+    "answer": "Verborgen palletkosten zijn kosten die niet direct zichtbaar zijn, zoals verlies, schade, en inefficiënte tracking."
+  },
+  {
+    "question": "Hoeveel kan ik besparen met pallet optimalisatie?",
+    "answer": "Gemiddeld besparen bedrijven 15-25% op palletkosten na implementatie van tracking en optimalisatie systemen."
+  }
+]
+```
+
+**Structure of `faq_schema`:**
+```json
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Wat zijn verborgen palletkosten?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Verborgen palletkosten zijn kosten die niet direct zichtbaar zijn..."
+      }
+    }
+  ]
+}
 ```
 
 ---
@@ -536,13 +647,14 @@ export type BlogArticle = {
   secondary_keywords: string[]
   tags: string[]
   seo_score: number
-  schema_markup: Record<string, any>  // JSON-LD schema
+  schema_markup: Record<string, any>  // JSON-LD schema (Article, HowTo, FAQ)
   internal_links: Array<{
     anchor: string
     url: string
     title?: string
     relevance?: number
   }>
+  keyword_analysis?: Record<string, any>
 
   // Media
   cover_image_url: string | null
@@ -554,12 +666,34 @@ export type BlogArticle = {
   read_time: number
   word_count: number
   language: string
+  topic_id?: string
 
   // Status
   status: 'draft' | 'published' | 'archived'
   published_at: string
   updated_at: string
   created_at: string
+
+  // Localization
+  geo_targeting?: string[]
+
+  // GEO (Generative Engine Optimization) - For AI Search
+  tldr: string | null                    // TL;DR summary for AI extraction
+  faq_items: Array<{                     // FAQ Q&A pairs
+    question: string
+    answer: string
+  }>
+  faq_schema: Record<string, any> | null // Pre-generated FAQPage schema
+  cited_statistics: Array<{              // Statistics with sources
+    statistic: string
+    source: string
+  }>
+  citations: Array<{                     // Expert quotes
+    quote: string
+    source: string
+    type?: string
+  }>
+  geo_optimized: boolean                 // GEO optimization flag
 
   // Analytics (optional)
   view_count?: number
@@ -597,6 +731,13 @@ export type BlogArticle = {
 - [ ] Never skip `alt` text on images
 - [ ] Always filter by `product_id`
 - [ ] Always use canonical URLs
+
+### GEO Critical (AI Search) 🤖
+- [ ] Render `tldr` section prominently at top of article
+- [ ] Render `faq_schema` as JSON-LD script tag
+- [ ] Display `faq_items` visually for users
+- [ ] Include both `schema_markup` AND `faq_schema` scripts
+- [ ] Use semantic class names (`.tldr`, `.faq-item`) for AI extraction
 
 ---
 

@@ -154,4 +154,39 @@ QA_REQUIREMENTS = {
     "keyword_density_max": 0.03,
     "min_internal_links": 1,  # Very lenient
     "max_internal_links": 10
+}
+
+# GEO (Generative Engine Optimization) Configuration
+# Optimizes content for AI search engines: ChatGPT, Google AI Overviews, Perplexity
+GEO_CONFIG = {
+    # Core GEO features
+    "enable_tldr": True,  # Generate TL;DR summaries for AI extraction
+    "enable_faq_schema": True,  # Generate FAQPage schema markup
+    "enable_citations": True,  # Include statistics with source attribution
+    "enable_expert_quotes": True,  # Include expert quotes in content
+
+    # TL;DR settings
+    "tldr_max_words": 75,
+    "tldr_min_words": 40,
+
+    # FAQ settings
+    "faq_count": {
+        "min": 3,
+        "max": 5
+    },
+
+    # Citation/Statistics requirements
+    "min_statistics": 3,  # Minimum statistics with sources per article
+    "min_citations": 2,  # Minimum expert quotes/citations per article
+
+    # Target AI platforms (for future platform-specific optimization)
+    "target_platforms": ["chatgpt", "google_ai", "perplexity"],
+
+    # Enhanced schema features
+    "speakable_enabled": True,  # Add speakable schema for voice assistants
+    "include_about_entities": True,  # Add entity definitions in schema
+
+    # Content structure for AI
+    "require_direct_answers": True,  # Ensure content has quotable statements
+    "heading_hierarchy_strict": True,  # Enforce H2→H3→bullets structure
 } 
