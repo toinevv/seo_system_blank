@@ -1,5 +1,5 @@
 """
-SEO Optimizer for Jachtexamen Blog
+SEO Optimizer for Multi-Product Blog System
 Handles title optimization, meta descriptions, keyword analysis, and schema markup
 """
 
@@ -12,6 +12,15 @@ from loguru import logger
 from bs4 import BeautifulSoup
 
 from config.settings import SEO_CONFIG, GEO_CONFIG
+from config.product_content import (
+    PRODUCT_INFO,
+    SEO_CONTENT,
+    INTERNAL_LINKS,
+    CATEGORIES,
+    get_base_url,
+    get_blog_url,
+    get_company_name,
+)
 
 
 class SEOOptimizer:
@@ -96,10 +105,10 @@ class SEOOptimizer:
         # Ensure it's within character limit
         if len(meta_desc) > 160:
             # Shorten while keeping key elements
-            meta_desc = f"Leer alles over {topic} voor je jachtexamen. ✓ Tips ✓ Examenvragen ✓ {current_year}. Start nu!"
-        
+            meta_desc = f"Learn about {topic}. Expert tips and practical advice for {current_year}."
+
         return meta_desc
-    
+
     def optimize_meta_description(self, meta_description: str) -> str:
         """Optimize existing meta description"""
         # Ensure proper length
@@ -107,7 +116,7 @@ class SEOOptimizer:
             meta_description = meta_description[:157] + "..."
         elif len(meta_description) < 120:
             # Add call-to-action if too short
-            meta_description += " Start nu met oefenen!"
+            meta_description += " Learn more today!"
         
         return meta_description
     
@@ -140,9 +149,9 @@ class SEOOptimizer:
             # Check if density is optimal (1-2%)
             density = analysis["primary_keyword"]["density"]
             if density < 1:
-                analysis["recommendations"].append(f"Verhoog dichtheid van '{primary_keyword}' (nu {density:.1f}%, doel: 1-2%)")
+                analysis["recommendations"].append(f"Increase density of '{primary_keyword}' (current: {density:.1f}%, target: 1-2%)")
             elif density > 3:
-                analysis["recommendations"].append(f"Verlaag dichtheid van '{primary_keyword}' (nu {density:.1f}%, doel: 1-2%)")
+                analysis["recommendations"].append(f"Reduce density of '{primary_keyword}' (current: {density:.1f}%, target: 1-2%)")
         
         # Analyze secondary keywords
         for keyword in secondary_keywords:
@@ -163,6 +172,10 @@ class SEOOptimizer:
         current_date = datetime.now().isoformat()
         category = article.get("category", "")
 
+        # Get configuration values
+        org = SEO_CONTENT.get("schema_organization", {})
+        publisher = SEO_CONTENT.get("schema_publisher", {})
+
         # Basic Article schema
         article_schema = {
             "@context": "https://schema.org",
@@ -171,40 +184,43 @@ class SEOOptimizer:
             "description": article.get("meta_description", article.get("excerpt", "")),
             "author": {
                 "@type": "Organization",
-                "name": "SmarterPallet",
-                "url": "https://smarterpallet.com"
+                "name": org.get("name", get_company_name()),
+                "url": org.get("url", get_base_url())
             },
             "publisher": {
                 "@type": "Organization",
-                "name": "NewSystem.AI B.V.",
-                "url": "https://newsystem.ai",
+                "name": publisher.get("name", get_company_name()),
+                "url": publisher.get("url", get_base_url()),
                 "logo": {
                     "@type": "ImageObject",
-                    "url": "https://smarterpallet.com/logo.png"
+                    "url": org.get("logo", f"{get_base_url()}/logo.png")
                 }
             },
             "datePublished": current_date,
             "dateModified": current_date,
             "mainEntityOfPage": {
                 "@type": "WebPage",
-                "@id": f"https://smarterpallet.com/blog/{article['slug']}"
+                "@id": get_blog_url(article['slug'])
             },
-            "articleSection": article.get("category", "Pallet Optimalisatie"),
+            "articleSection": article.get("category", SEO_CONTENT.get("default_category", "general")),
             "keywords": ", ".join(article.get("tags", [])),
             "wordCount": article.get("word_count", 0),
             "timeRequired": f"PT{article.get('read_time', 5)}M",
-            "inLanguage": "nl-NL",
+            "inLanguage": PRODUCT_INFO["language"],
             "audience": {
                 "@type": "Audience",
-                "audienceType": "Warehouse Managers, Logistics Professionals, Supply Chain Managers"
+                "audienceType": SEO_CONTENT.get("audience_type", "General Audience")
             }
         }
 
         # Enhance Article schema with GEO fields for AI search visibility
         article_schema = self.enhance_article_schema_for_geo(article_schema, article)
 
-        # Add HowTo schema for optimization/efficiency guides
-        if category in ["optimalisatie", "warehouse_efficiency"] or "stappen" in article["content"].lower():
+        # Add HowTo schema for tutorial/guide categories
+        howto_categories = CATEGORIES.get("howto_categories", ["tutorials", "guides", "how_to"])
+        content_lower = article["content"].lower()
+        has_steps = any(indicator in content_lower for indicator in ["step 1", "step 2", "stap 1", "stap 2", "steps:", "stappen:"])
+        if category in howto_categories or has_steps:
             howto_schema = {
                 "@context": "https://schema.org",
                 "@type": "HowTo",
@@ -301,67 +317,30 @@ class SEOOptimizer:
         return article_schema
 
     def suggest_internal_links(self, article: Dict) -> List[Dict]:
-        """Suggest internal links for SmarterPallet"""
+        """Suggest internal links based on product configuration"""
         content = article["content"].lower()
         category = article.get("category", "")
 
-        # Landing page links (always relevant for conversion)
-        landing_links = [
-            {
-                "anchor_text": "bereken uw verborgen kosten",
-                "url": "/#calculator",
-                "title": "Pallet Kosten Calculator",
-                "relevance": 9,
-                "category": "landing"
-            },
-            {
-                "anchor_text": "plan een gratis intake",
-                "url": "/#contact",
-                "title": "Gratis Intake Gesprek",
-                "relevance": 8,
-                "category": "landing"
-            }
-        ]
+        # Get configured landing links (CTAs)
+        landing_links = INTERNAL_LINKS.get("landing_links", [])
+        suggestions = [link.copy() for link in landing_links]
 
-        # Category-based blog link suggestions
-        related_topics = {
-            "pallet_kosten": [
-                {"anchor": "pallet verlies voorkomen", "url": "/blog/pallet-verlies-voorkomen", "title": "Pallet Verlies Voorkomen"},
-                {"anchor": "CHEP kosten breakdown", "url": "/blog/chep-kosten-breakdown", "title": "CHEP Kosten Breakdown"},
-                {"anchor": "verborgen palletkosten", "url": "/blog/verborgen-palletkosten", "title": "Verborgen Palletkosten Ontdekken"}
-            ],
-            "optimalisatie": [
-                {"anchor": "warehouse efficiency", "url": "/blog/warehouse-efficiency-tips", "title": "Warehouse Efficiency Tips"},
-                {"anchor": "EPAL verificatie", "url": "/blog/epal-verificatie-checklist", "title": "EPAL Verificatie Checklist"},
-                {"anchor": "pallet administratie", "url": "/blog/pallet-administratie-automatiseren", "title": "Pallet Administratie Automatiseren"}
-            ],
-            "pooling_systemen": [
-                {"anchor": "CHEP vs LPR", "url": "/blog/chep-vs-lpr-vergelijking", "title": "CHEP vs LPR Vergelijking"},
-                {"anchor": "pooling penalties", "url": "/blog/pooling-penalties-voorkomen", "title": "Pooling Penalties Voorkomen"},
-                {"anchor": "eigen pallets vs pooling", "url": "/blog/eigen-pallets-vs-pooling", "title": "Eigen Pallets vs Pooling ROI"}
-            ],
-            "case_studies": [
-                {"anchor": "ROI case study", "url": "/blog/roi-case-study-12k-besparing", "title": "€12K Besparing Case Study"},
-                {"anchor": "pallet tracking implementatie", "url": "/blog/pallet-tracking-implementatie", "title": "Pallet Tracking Implementatie"},
-                {"anchor": "warehouse optimalisatie succesverhaal", "url": "/blog/warehouse-optimalisatie-case", "title": "Warehouse Optimalisatie Case"}
-            ]
-        }
-
-        suggestions = landing_links.copy()
+        # Get configured category-based related topics
+        related_topics = INTERNAL_LINKS.get("related_topics", {})
 
         # Find relevant blog links based on category and content
         if category in related_topics:
             for link in related_topics[category][:3]:  # Max 3 blog links per category
                 suggestions.append({
-                    "anchor_text": link["anchor"],
-                    "url": link["url"],
-                    "title": link["title"],
-                    "relevance": self._calculate_link_relevance(content, link["anchor"]),
+                    "anchor_text": link.get("anchor", link.get("text", "")),
+                    "url": link.get("url", ""),
+                    "title": link.get("title", ""),
+                    "relevance": self._calculate_link_relevance(content, link.get("anchor", link.get("text", ""))),
                     "category": category
                 })
 
         # Sort by relevance and limit to 5 links
-        suggestions.sort(key=lambda x: x["relevance"], reverse=True)
+        suggestions.sort(key=lambda x: x.get("relevance", 0), reverse=True)
         return suggestions[:5]
     
     def calculate_seo_score(self, article: Dict) -> int:
@@ -538,23 +517,26 @@ class SEOOptimizer:
         
         return robots
     
-    def generate_canonical_url(self, article: Dict, base_url: str = "https://jachtexamen-oefenen.nl") -> str:
+    def generate_canonical_url(self, article: Dict, base_url: str = None) -> str:
         """Generate canonical URL"""
+        if base_url is None:
+            base_url = get_base_url()
         slug = article.get("slug", "")
-        return f"{base_url}/blog/{slug}"
+        return get_blog_url(slug)
     
     def generate_social_media_meta(self, article: Dict) -> Dict:
         """Generate Open Graph and Twitter Card meta tags"""
-        base_url = "https://jachtexamen-oefenen.nl"
-        
+        base_url = get_base_url()
+        site_name = SEO_CONTENT.get("site_name", get_company_name())
+
         return {
             "og": {
                 "title": article["title"],
                 "description": article.get("meta_description", ""),
-                "url": f"{base_url}/blog/{article['slug']}",
+                "url": get_blog_url(article['slug']),
                 "type": "article",
-                "site_name": "Jachtexamen Oefenen",
-                "locale": "nl_NL",
+                "site_name": site_name,
+                "locale": PRODUCT_INFO["language"].replace("-", "_"),
                 "image": article.get("cover_image_url", f"{base_url}/images/default-blog.jpg")
             },
             "twitter": {
@@ -569,7 +551,7 @@ class SEOOptimizer:
 def generate_sitemap_entry(article: Dict) -> Dict:
     """Generate sitemap entry for article"""
     return {
-        "url": f"https://jachtexamen-oefenen.nl/blog/{article['slug']}",
+        "url": get_blog_url(article['slug']),
         "lastmod": article.get("updated_at", article.get("created_at", datetime.now().isoformat())),
         "changefreq": "monthly",
         "priority": "0.7"
@@ -578,32 +560,32 @@ def generate_sitemap_entry(article: Dict) -> Dict:
 def validate_seo_requirements(article: Dict) -> List[str]:
     """Validate article meets SEO requirements"""
     issues = []
-    
+
     # Title validation
     title = article.get("title", "")
     if len(title) < 30:
-        issues.append("Titel te kort (minimaal 30 karakters)")
+        issues.append("Title too short (minimum 30 characters)")
     elif len(title) > 70:
-        issues.append("Titel te lang (maximaal 70 karakters)")
-    
+        issues.append("Title too long (maximum 70 characters)")
+
     # Meta description validation
     meta_desc = article.get("meta_description", "")
     if len(meta_desc) < 120:
-        issues.append("Meta beschrijving te kort (minimaal 120 karakters)")
+        issues.append("Meta description too short (minimum 120 characters)")
     elif len(meta_desc) > 160:
-        issues.append("Meta beschrijving te lang (maximaal 160 karakters)")
-    
+        issues.append("Meta description too long (maximum 160 characters)")
+
     # Content length validation
     keyword_analysis = article.get("keyword_analysis", {})
     word_count = keyword_analysis.get("word_count", 0)
     if word_count < 1000:
-        issues.append(f"Artikel te kort ({word_count} woorden, minimaal 1000)")
-    
+        issues.append(f"Article too short ({word_count} words, minimum 1000)")
+
     # Keyword density validation
     primary_density = keyword_analysis.get("primary_keyword", {}).get("density", 0)
     if primary_density < 0.5:
-        issues.append("Primaire keyword dichtheid te laag")
+        issues.append("Primary keyword density too low")
     elif primary_density > 3:
-        issues.append("Primaire keyword dichtheid te hoog")
-    
+        issues.append("Primary keyword density too high")
+
     return issues 

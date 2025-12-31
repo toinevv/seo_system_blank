@@ -1,5 +1,13 @@
 """
-Configuration settings for the Jachtexamen Blog System
+Configuration settings for the Multi-Product Blog System
+
+NOTE: Product-specific content (prompts, links, categories, etc.) is now in:
+      config/product_content.py
+
+This file contains:
+- Environment settings (API keys, database credentials)
+- Technical configuration (API models, rate limits)
+- SEO and publishing settings
 """
 import os
 from typing import Dict, List, Any
@@ -9,6 +17,9 @@ try:
 except ImportError:
     # Fallback for older pydantic versions
     from pydantic import BaseSettings
+
+# Import product configuration
+from config.product_content import PRODUCT_INFO, GOOGLE_NEWS as GOOGLE_NEWS_CONTENT
 
 class Settings(BaseSettings):
     """Application settings"""
@@ -26,50 +37,42 @@ class Settings(BaseSettings):
     # General
     environment: str = os.getenv("ENVIRONMENT", "development")
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
-    timezone: str = os.getenv("TIMEZONE", "Europe/Amsterdam")
+    timezone: str = os.getenv("TIMEZONE", "UTC")
     
     class Config:
         env_file = ".env"
 
-# SEO Configuration
+# SEO Configuration (Technical settings only - product content is in product_content.py)
 SEO_CONFIG = {
-    "title_template": "{keyword} - Pallet Optimalisatie {year} | SmarterPallet",
-    "meta_description_template": "Ontdek hoe {topic} uw palletkosten verlaagt. ✓ Praktische tips ✓ ROI voorbeelden ✓ {year}",
-
-    "target_keywords": {
-        "primary": ["pallet kosten", "pallet optimalisatie", "pallet verlies"],
-        "location": ["nederland", "nederlandse", "warehouse"],
-        "intent": ["besparen", "optimaliseren", "verlagen", "kosten reduceren"]
-    },
-
+    # Internal linking rules
     "internal_linking_rules": {
         "min_links": 2,
         "max_links": 5,
         "anchor_text_variation": True,
         "relevant_categories_only": True,
-        "landing_page_links": True  # Link to calculator/intake
+        "landing_page_links": True
     },
 
+    # Supported schema types
     "schema_types": [
         "Article",
         "HowTo",
         "FAQPage"
     ],
 
-    "geo_targeting": {
-        "primary": "Nederland",
-        "secondary": ["België", "Vlaanderen"],
-        "language": "nl-NL"
-    }
+    # Fallback meta description template (used when AI doesn't generate one)
+    # Note: Product-specific template should be in product_content.py SEO_CONTENT
+    "meta_description_template": "Learn about {topic}. Expert tips and practical advice for {year}."
 }
 
 # Multi-Product Configuration
+# Values come from config/product_content.py, with environment variable overrides
 PRODUCT_CONFIG = {
-    "product_id": os.getenv("PRODUCT_ID", "smarterpallet"),
-    "website_domain": os.getenv("WEBSITE_DOMAIN", "smarterpallet.com"),
-    "base_url": "https://smarterpallet.com",
-    "company_name": "SmarterPallet",
-    "parent_company": "NewSystem.AI"
+    "product_id": os.getenv("PRODUCT_ID", PRODUCT_INFO.get("product_id", "default")),
+    "website_domain": os.getenv("WEBSITE_DOMAIN", PRODUCT_INFO.get("website_domain", "example.com")),
+    "base_url": PRODUCT_INFO.get("base_url", "https://example.com"),
+    "company_name": PRODUCT_INFO.get("company_name", "Company Name"),
+    "parent_company": PRODUCT_INFO.get("parent_company", "Parent Company")
 }
 
 # API Configuration
@@ -98,21 +101,12 @@ API_CONFIG = {
 }
 
 # Google News Configuration
+# Values come from config/product_content.py
 GOOGLE_NEWS_CONFIG = {
-    "search_queries": [
-        "pallet kosten nederland nieuws",
-        "warehouse optimalisatie actueel",
-        "logistiek efficiency {current_year}",
-        "supply chain pallet management nederland"
-    ],
-    "relevance_keywords": [
-        "pallet", "warehouse", "logistiek", "kosten",
-        "efficiency", "optimalisatie", "verlies", "CHEP", "LPR", "EPAL"
-    ],
-    "exclude_keywords": [
-        "accident", "ongeval", "faillissement", "fraude"
-    ],
-    "min_relevance_score": 0.7
+    "search_queries": GOOGLE_NEWS_CONTENT.get("search_queries", []),
+    "relevance_keywords": GOOGLE_NEWS_CONTENT.get("relevance_keywords", []),
+    "exclude_keywords": GOOGLE_NEWS_CONTENT.get("exclude_keywords", []),
+    "min_relevance_score": GOOGLE_NEWS_CONTENT.get("min_relevance_score", 0.7)
 }
 
 # Publishing Schedule

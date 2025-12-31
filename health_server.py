@@ -37,7 +37,7 @@ class HealthHandler(BaseHTTPRequestHandler):
             response = {
                 "status": "healthy",
                 "timestamp": datetime.now().isoformat(),
-                "service": "jachtexamen-blog-worker",
+                "service": "seo-blog-worker",
                 "environment": os.getenv("ENVIRONMENT", "unknown")
             }
             
@@ -61,7 +61,7 @@ class HealthHandler(BaseHTTPRequestHandler):
             response = {
                 "status": "operational",
                 "timestamp": datetime.now().isoformat(),
-                "service": "jachtexamen-blog-worker",
+                "service": "seo-blog-worker",
                 "last_run": last_run,
                 "environment": os.getenv("ENVIRONMENT", "development"),
                 "run_mode": os.getenv("RAILWAY_RUN_MODE", "once"),

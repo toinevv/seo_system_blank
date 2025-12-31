@@ -1,11 +1,12 @@
 """
-Utility functions for Jachtexamen Blog System
+Utility functions for Multi-Product SEO Blog System
 Common helper functions, validation, and utilities
 """
 
 import os
 import re
 import json
+import time
 import hashlib
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Union
@@ -106,24 +107,33 @@ def generate_slug(text: str, max_length: int = 50) -> str:
 
 def extract_keywords(text: str, min_length: int = 3, max_keywords: int = 10) -> List[str]:
     """Extract keywords from text"""
-    # Common Dutch stop words
+    # Common stop words (English and common European)
     stop_words = {
-        'de', 'het', 'een', 'van', 'in', 'voor', 'met', 'op', 'te', 'is', 'als', 'bij', 'dit', 'dat',
-        'die', 'deze', 'naar', 'aan', 'om', 'door', 'over', 'tot', 'uit', 'ook', 'maar', 'zijn',
-        'hebben', 'worden', 'kunnen', 'zijn', 'haar', 'hem', 'zijn', 'zij', 'wij', 'jullie'
+        # English
+        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+        'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had',
+        'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must',
+        'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'we', 'our',
+        'you', 'your', 'he', 'she', 'him', 'her', 'his', 'who', 'which', 'what', 'where',
+        'when', 'why', 'how', 'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other',
+        'some', 'such', 'no', 'not', 'only', 'same', 'so', 'than', 'too', 'very', 'can',
+        # Dutch
+        'de', 'het', 'een', 'van', 'in', 'voor', 'met', 'op', 'te', 'is', 'als', 'bij',
+        'dit', 'dat', 'die', 'deze', 'naar', 'aan', 'om', 'door', 'over', 'tot', 'uit',
+        'ook', 'maar', 'zijn', 'hebben', 'worden', 'kunnen', 'haar', 'hem', 'zij', 'wij'
     }
-    
+
     # Extract words
     words = re.findall(r'\b[a-zA-Z]+\b', text.lower())
-    
+
     # Filter keywords
     keywords = []
     for word in words:
-        if (len(word) >= min_length and 
-            word not in stop_words and 
+        if (len(word) >= min_length and
+            word not in stop_words and
             word not in keywords):
             keywords.append(word)
-    
+
     return keywords[:max_keywords]
 
 
@@ -141,25 +151,16 @@ def calculate_reading_time(text: str, words_per_minute: int = 250) -> int:
     return reading_time
 
 
-def format_dutch_date(date: datetime, format_type: str = "full") -> str:
-    """Format date in Dutch"""
-    dutch_months = {
-        1: "januari", 2: "februari", 3: "maart", 4: "april",
-        5: "mei", 6: "juni", 7: "juli", 8: "augustus",
-        9: "september", 10: "oktober", 11: "november", 12: "december"
-    }
-    
-    dutch_days = {
-        0: "maandag", 1: "dinsdag", 2: "woensdag", 3: "donderdag",
-        4: "vrijdag", 5: "zaterdag", 6: "zondag"
-    }
-    
+def format_date(date: datetime, format_type: str = "full") -> str:
+    """Format date in standard format"""
     if format_type == "full":
-        return f"{dutch_days[date.weekday()]} {date.day} {dutch_months[date.month]} {date.year}"
+        return date.strftime("%A, %B %d, %Y")
     elif format_type == "short":
-        return f"{date.day} {dutch_months[date.month]} {date.year}"
+        return date.strftime("%B %d, %Y")
+    elif format_type == "iso":
+        return date.strftime("%Y-%m-%d")
     else:
-        return date.strftime("%d-%m-%Y")
+        return date.strftime("%Y-%m-%d")
 
 
 def validate_article_data(article: Dict) -> List[str]:
@@ -227,21 +228,6 @@ def hash_content(content: str) -> str:
     return hashlib.md5(content.encode('utf-8')).hexdigest()
 
 
-def validate_dutch_text(text: str) -> bool:
-    """Basic validation for Dutch text"""
-    # Check for common Dutch words
-    dutch_indicators = [
-        'de', 'het', 'een', 'van', 'in', 'voor', 'met', 'op', 'te', 'is',
-        'jacht', 'wild', 'natuur', 'Nederland', 'Nederlandse'
-    ]
-    
-    text_lower = text.lower()
-    found_indicators = sum(1 for word in dutch_indicators if word in text_lower)
-    
-    # Should have at least 3 Dutch indicators
-    return found_indicators >= 3
-
-
 def clean_filename(filename: str) -> str:
     """Clean filename for safe file operations"""
     # Remove or replace unsafe characters
@@ -259,12 +245,20 @@ def clean_filename(filename: str) -> str:
     return filename
 
 
-def format_number_dutch(number: Union[int, float]) -> str:
-    """Format number in Dutch style (comma as decimal separator)"""
-    if isinstance(number, float):
-        return f"{number:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+def format_number(number: Union[int, float], locale: str = "en") -> str:
+    """Format number with locale-appropriate separators"""
+    if locale in ["nl", "de", "es", "it", "pt"]:
+        # European style: 1.234,56
+        if isinstance(number, float):
+            return f"{number:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        else:
+            return f"{number:,}".replace(',', '.')
     else:
-        return f"{number:,}".replace(',', '.')
+        # English style: 1,234.56
+        if isinstance(number, float):
+            return f"{number:,.2f}"
+        else:
+            return f"{number:,}"
 
 
 def create_backup_filename(prefix: str = "backup", extension: str = "json") -> str:

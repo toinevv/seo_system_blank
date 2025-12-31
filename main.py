@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Main entry point for Jachtexamen Blog System
-Automated blog writing system for Dutch hunting exam platform
+Main entry point for Multi-Product SEO Blog System
+Automated blog content generation with SEO and GEO optimization
 """
 
 import asyncio
@@ -25,9 +25,9 @@ from config.settings import Settings
 from loguru import logger
 
 
-class JachtexamenBlogSystem:
+class BlogSystem:
     """Main orchestrator for the blog system"""
-    
+
     def __init__(self):
         self.settings = Settings()
         self.topic_manager = TopicManager()
@@ -35,10 +35,10 @@ class JachtexamenBlogSystem:
         self.seo_optimizer = SEOOptimizer()
         self.database_manager = DatabaseManager()
         self.scheduler = BlogScheduler()
-    
+
     async def initialize(self) -> bool:
         """Initialize the blog system"""
-        logger.info("🚀 Initializing Jachtexamen Blog System...")
+        logger.info("🚀 Initializing Blog System...")
         
         # Validate environment
         if not validate_environment():
@@ -199,7 +199,7 @@ class JachtexamenBlogSystem:
 
 async def main():
     """Main function with CLI interface"""
-    parser = argparse.ArgumentParser(description="Jachtexamen Blog System")
+    parser = argparse.ArgumentParser(description="SEO Blog System")
     parser.add_argument("command", choices=[
         "init", "generate", "scheduler", "check", "backup", "discover", "stats", "emergency"
     ], help="Command to execute")
@@ -213,7 +213,7 @@ async def main():
     setup_logging(args.log_level)
     
     # Initialize system
-    system = JachtexamenBlogSystem()
+    system = BlogSystem()
     
     if args.command == "init":
         logger.info("🚀 Initializing blog system...")
@@ -291,10 +291,10 @@ async def main():
 
 def run_interactive_mode():
     """Run system in interactive mode"""
-    print("🎯 Jachtexamen Blog System - Interactive Mode")
+    print("🎯 SEO Blog System - Interactive Mode")
     print("=" * 50)
-    
-    system = JachtexamenBlogSystem()
+
+    system = BlogSystem()
     
     while True:
         print("\nAvailable commands:")

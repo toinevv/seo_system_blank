@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Railway Worker for Jachtexamen Blog System
+Railway Worker for Multi-Product SEO Blog System
 Handles scheduled blog generation every 1-3 days
 """
 

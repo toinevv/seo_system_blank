@@ -12,6 +12,7 @@ from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config.settings import Settings, ERROR_HANDLING, PRODUCT_CONFIG
+from config.product_content import PRODUCT_INFO, get_author
 
 
 class DatabaseManager:
@@ -360,17 +361,22 @@ class DatabaseManager:
             "created_at": current_time,
             "updated_at": current_time,
             "status": "published",
-            "author": article_data.get("author", "SmarterPallet Expert"),
+            "author": article_data.get("author", get_author()),
             "read_time": article_data.get("read_time", 5),
-            "geo_targeting": ["Nederland", "België"],
-            "language": "nl-NL",
+            "geo_targeting": PRODUCT_INFO.get("geo_targeting", []),
+            "language": PRODUCT_INFO.get("language", "en-US"),
             # Multi-product fields
             "product_id": self.product_id,
             "website_domain": self.website_domain
         }
 
-        # Add optional fields if present
-        optional_fields = ["category", "topic_id", "seo_score", "keyword_analysis"]
+        # Add optional fields if present (including GEO fields)
+        optional_fields = [
+            "category", "topic_id", "seo_score", "keyword_analysis",
+            # GEO (Generative Engine Optimization) fields
+            "tldr", "faq_items", "cited_statistics", "citations",
+            "geo_optimized", "faq_schema"
+        ]
         for field in optional_fields:
             if field in article_data:
                 db_article[field] = article_data[field]

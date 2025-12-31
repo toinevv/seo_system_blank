@@ -1,222 +1,107 @@
 """
-AI Prompt templates for pallet optimization content generation
+AI Prompt Templates for Multi-Product Blog System
+
+NOTE: These are structural templates only. Language and product-specific content
+comes from config/product_content.py (SYSTEM_PROMPTS section).
+
+The system prompt (set in product_content.py) tells the AI:
+- What language to write in
+- What industry/niche to focus on
+- What tone/style to use
+- Who the target audience is
+
+These templates provide the STRUCTURE and GEO optimization requirements.
 """
 
+# =============================================================================
+# BLOG ARTICLE GENERATION PROMPTS
+# =============================================================================
+
 BLOG_PROMPT_TEMPLATE = """
-Schrijf een uitgebreid en kwalitatief hoogstaand blogartikel in het Nederlands
-voor een pallet optimalisatie platform.
+Write a comprehensive, high-quality blog article.
 
-🎯 FOCUS: Schrijf een kwalitatief artikel van MINIMAAL 700 woorden!
+TOPIC: {topic}
+PRIMARY KEYWORD: {primary_keyword}
+SECONDARY KEYWORDS: {secondary_keywords}
 
-ONDERWERP: {topic}
-PRIMAIRE KEYWORD: {primary_keyword}
-SECUNDAIRE KEYWORDS: {secondary_keywords}
+MINIMUM LENGTH: 700 words
 
-VERPLICHTE STRUCTUUR (MINIMAAL 700 woorden):
+REQUIRED STRUCTURE:
 
-1. TITEL (H1): Pakkende titel (50-60 karakters) met focus op palletkosten/optimalisatie
+1. TITLE (H1): Engaging title (50-60 characters) including primary keyword
 
-2. INLEIDING (100-150 woorden):
-   - Introduceer het probleem voor warehouse/logistiek managers
-   - Waarom dit relevant is (kosten, efficiency)
-   - Wat de lezer gaat leren
-   - Include ROI/besparing preview
+2. INTRODUCTION (100-150 words):
+   - Hook the reader with a compelling statistic or insight
+   - Explain why this topic matters
+   - Preview what the reader will learn
 
-3. HOOFDSECTIE 1 - HET PROBLEEM & IMPACT (150-200 woorden):
-   - Concrete cijfers over kosten/verlies
-   - Waarom dit vaak onzichtbaar is
-   - Impact op bedrijfsresultaat
-   - Nederlandse context (CHEP/LPR/EPAL)
+3. MAIN SECTION 1 - Problem/Context (150-200 words):
+   - Explain the core issue or concept
+   - Include relevant statistics with sources
+   - Provide industry context
 
-4. HOOFDSECTIE 2 - OPLOSSING & BEST PRACTICES (200-250 woorden):
-   - Stap-voor-stap praktische aanpak
-   - Concrete tips en trucs
-   - Tools en methoden
-   - Veelgemaakte fouten vermijden
+4. MAIN SECTION 2 - Solution/Best Practices (200-250 words):
+   - Step-by-step practical guidance
+   - Concrete tips and strategies
+   - Common mistakes to avoid
 
-5. HOOFDSECTIE 3 - ROI & CASE STUDY (100-150 woorden):
-   - Rekenvoorbeeld met concrete cijfers
-   - Case study voorbeeld
-   - Besparings potentieel
-   - Implementatie tijdlijn
+5. MAIN SECTION 3 - Examples/Case Study (100-150 words):
+   - Real-world examples
+   - ROI calculations if applicable
+   - Implementation timeline
 
-6. CONCLUSIE & CALL-TO-ACTION (80-100 woorden):
-   - Samenvatting hoofdpunten
-   - Vervolgstappen voor de lezer
-   - Link naar calculator of intake gesprek
+6. CONCLUSION & CALL-TO-ACTION (80-100 words):
+   - Summarize key points
+   - Clear next steps for the reader
 
-EXTRA VEREISTEN:
-- Gebruik H2 en H3 koppen voor structuur
-- Voeg bullet points en genummerde lijsten toe
-- Minimaal 5 concrete voorbeelden
-- Minimaal 3 praktische tips per sectie
-- Gebruik Nederlandse warehouse/logistics terminologie
+FORMATTING REQUIREMENTS:
+- Use H2 and H3 headings for structure
+- Include bullet points and numbered lists
+- Use HTML formatting (<h2>, <h3>, <ul>, <li>, <p>)
+- Include primary keyword 3-4 times naturally
+- Include secondary keywords where relevant
 
-SEO OPTIMALISATIE:
-- Keyword dichtheid: 1-2% voor primaire keyword
-- Natuurlijke integratie van secundaire keywords
-- Interne link mogelijkheden naar calculator en intake
-- Link naar gerelateerde blog posts
+IMPORTANT: Start DIRECTLY with the article content. NO meta-commentary like "Here is the article".
 
-TONE OF VOICE:
-- B2B professioneel maar toegankelijk
-- Data-gedreven en ROI-focused
-- Gericht op warehouse/logistiek managers in Nederland
-- Praktisch en direct toepasbaar
-- Bemoedigend en oplossingsgericht
-
-💡 PRAKTISCHE FOCUS: Schrijf een informatief artikel van MINIMAAL 700 woorden!
-
-- Focus op duidelijke, praktische informatie
-- Gebruik het primaire keyword natuurlijk door het artikel (minstens 2-3 keer)
-- Gebruik concrete voorbeelden en ROI berekeningen waar relevant
-- Schrijf voor warehouse managers die kosten willen besparen
-- Zorg voor goede keyword dichtheid zonder het geforceerd te laten klinken
-
-⚠️ BELANGRIJK: Begin DIRECT met het artikel. GEEN introducerende zinnen zoals "Here is the article" of "Hier is het artikel". Start meteen met de inhoud!
-
-✍️ SCHRIJF NU HET KWALITATIEVE ARTIKEL:
+Write the complete article now:
 """
 
 TITLE_GENERATION_PROMPT = """
-Genereer 5 SEO-geoptimaliseerde titels voor een pallet optimalisatie blog artikel over het onderwerp: {topic}
+Generate 5 SEO-optimized titles for a blog article about: {topic}
 
-Vereisten:
-- 50-60 karakters lang
-- Bevat de primaire keyword: {primary_keyword}
-- Aantrekkelijk voor warehouse/logistiek managers
-- Nederlandse taal
-- Focus op ROI/besparing element waar mogelijk
+Requirements:
+- 50-60 characters long
+- Contains the primary keyword: {primary_keyword}
+- Engaging and click-worthy
+- Professional tone
 
-Voorbeelden van goede titels:
-- "Pallet Verlies Voorkomen - €5K Besparing/Maand 2025"
-- "CHEP Kosten Breakdown: Complete Gids 2025"
-- "Warehouse Efficiency: 7 Bewezen Tactieken"
-
-Geef alleen de 5 titels, elk op een nieuwe regel:
+Provide only the 5 titles, each on a new line:
 """
 
 META_DESCRIPTION_PROMPT = """
-Schrijf een SEO-geoptimaliseerde meta beschrijving voor dit pallet optimalisatie blog artikel:
+Write an SEO-optimized meta description for this blog article:
 
-TITEL: {title}
-PRIMAIRE KEYWORD: {primary_keyword}
-ARTICLE TOPIC: {topic}
+TITLE: {title}
+PRIMARY KEYWORD: {primary_keyword}
+TOPIC: {topic}
 
-Vereisten:
-- Exact 150-160 karakters
-- Bevat primaire keyword
-- Gebruik actionable woorden
-- Include benefits/ROI proposition
-- Nederlandse taal
-- Emoji's waar passend (✓, 🎯, 💰)
+Requirements:
+- Exactly 150-160 characters
+- Contains primary keyword
+- Uses action-oriented language
+- Includes value proposition
 
-Format: Geef alleen de meta beschrijving terug, geen extra tekst.
+Format: Return only the meta description, no additional text.
 """
 
-INTERNAL_LINKS_PROMPT = """
-Analyseer dit blog artikel en suggereer interne links naar gerelateerde pallet optimalisatie onderwerpen.
-
-ARTIKEL CONTENT: {content}
-HOOFDONDERWERP: {main_topic}
-BESCHIKBARE CATEGORIEËN: {available_categories}
-
-Genereer 3-7 interne link suggesties met:
-1. Anchor tekst (natuurlijk in de context)
-2. Doelpagina onderwerp
-3. Relevantie score (1-10)
-4. Positie in artikel (paragraaf nummer)
-
-Include ook links naar:
-- Calculator (/#calculator)
-- Intake formulier (/#contact)
-
-Format als JSON:
-[
-  {
-    "anchor_text": "bereken uw verborgen kosten",
-    "target_topic": "Pallet Kosten Calculator",
-    "url": "/#calculator",
-    "relevance": 9,
-    "paragraph": 3
-  }
-]
-"""
-
-SCHEMA_MARKUP_PROMPT = """
-Genereer JSON-LD schema markup voor dit pallet optimalisatie blog artikel:
-
-TITEL: {title}
-CONTENT: {content_excerpt}
-AUTHOR: SmarterPallet Expert
-PUBLISH_DATE: {publish_date}
-CATEGORY: {category}
-
-Vereiste schema types:
-- Article
-- HowTo (indien van toepassing voor optimization guides)
-
-Return alleen de JSON-LD, geen extra tekst.
-"""
-
-CONTENT_OPTIMIZATION_PROMPT = """
-Optimaliseer deze blog content voor SEO en leesbaarheid:
-
-ORIGINELE CONTENT: {original_content}
-DOELKEYWORD: {target_keyword}
-HUIDIGE KEYWORD DICHTHEID: {current_density}%
-DOEL DICHTHEID: 1-2%
-
-Verbeteringen aanbrengen voor:
-1. Keyword dichtheid optimalisatie
-2. Leesbaarheid verbeteren
-3. Header structuur optimaliseren
-4. Call-to-action toevoegen (calculator/intake)
-5. Nederlandse grammatica en spelling
-6. ROI voorbeelden toevoegen waar relevant
-
-Geef de geoptimaliseerde versie terug in HTML formaat.
-"""
-
-TOPIC_RELEVANCE_PROMPT = """
-Beoordeel de relevantie van dit nieuws artikel voor pallet optimalisatie content:
-
-NIEUWS ARTIKEL: {news_content}
-TITEL: {news_title}
-
-Beoordeling criteria:
-1. Direct gerelateerd aan pallet/logistics (score 1-10)
-2. Waarde voor warehouse managers (score 1-10)
-3. Nederlandse context (score 1-10)
-4. Actualiteit waarde (score 1-10)
-
-Geef ook suggesties voor:
-- Blog artikel titel
-- Hoofdonderwerpen om te behandelen
-- Keywords om te targeten
-
-Format als JSON:
-{
-  "relevance_score": 8.5,
-  "direct_pallet_relation": 9,
-  "business_value": 8,
-  "dutch_context": 9,
-  "actuality": 8,
-  "suggested_title": "...",
-  "main_topics": ["...", "..."],
-  "target_keywords": ["...", "..."]
-}
-"""
-
-# API-specific prompt templates for better length control
-# Enhanced with GEO (Generative Engine Optimization) for AI search visibility
+# =============================================================================
+# GEO-OPTIMIZED PROMPTS (For AI Search Visibility)
+# =============================================================================
 
 OPENAI_SPECIFIC_PROMPT = """
-⚠️ MINIMUM LENGTH: 700 WORDS REQUIRED ⚠️
+MINIMUM LENGTH: 700 WORDS REQUIRED
 
-You are writing for a Dutch pallet optimization platform. Write AT LEAST 700 words of high-quality B2B content optimized for both traditional search AND AI search engines (ChatGPT, Google AI, Perplexity).
-
-WORD COUNT REQUIREMENT: **MINIMUM 700 WORDS** - Be comprehensive!
+Write a comprehensive blog article optimized for both traditional search AND AI search engines (ChatGPT, Google AI, Perplexity).
 
 TOPIC: {topic}
 PRIMARY KEYWORD: {primary_keyword}
@@ -227,149 +112,221 @@ REQUIRED STRUCTURE (MINIMUM 700 WORDS):
 1. **TITLE**: Include primary keyword (50-60 characters)
 
 2. **TL;DR SUMMARY** (50-75 words) - CRITICAL FOR AI SEARCH:
-   - Start with: <div class="tldr"><strong>TL;DR:</strong>
-   - Write a concise summary covering: the problem, solution, and key benefit
+   - Format: <div class="tldr"><strong>TL;DR:</strong> [Summary] </div>
+   - Cover: the problem, solution, and key benefit
    - This is what AI assistants will quote - make it impactful!
-   - End with: </div>
 
 3. **INTRODUCTION** (100-150 words):
-   - Hook the reader with cost/ROI impact
-   - Include a statistic with source: "Volgens [Industry Report/Organization], [specific stat]..."
-   - Explain why this topic is crucial for warehouse efficiency
+   - Hook with compelling insight or statistic
+   - Include a cited statistic: "According to [Source], [stat]..."
+   - Explain why this topic matters
    - Include primary keyword naturally
 
-4. **MAIN SECTION 1: The Problem & Impact** (150-200 words):
-   - Detailed explanation of the problem
-   - Include 1-2 statistics WITH SOURCES: "Onderzoek van [Organization] toont aan dat..."
-   - Dutch context (CHEP, LPR, EPAL systems)
-   - Use primary keyword 1-2 times naturally
-   - Add concrete examples and facts
+4. **MAIN SECTION 1: Problem/Context** (150-200 words):
+   - Detailed explanation
+   - 1-2 statistics WITH SOURCES
+   - Industry-specific context
+   - Concrete examples
 
 5. **MAIN SECTION 2: Solutions & Best Practices** (200-250 words):
    - Step-by-step practical guidance
-   - Include an expert quote: "Zoals [Expert/Company] stelt: '...'"
-   - Real-world implementation examples
-   - Cost-saving strategies
+   - Include an expert quote: "As [Expert/Company] states: '...'"
+   - Real-world examples
    - Common mistakes to avoid
    - Include secondary keywords naturally
 
-6. **MAIN SECTION 3: ROI & Case Study** (100-150 words):
-   - Concrete ROI calculations with specific percentages
-   - Include statistic: "Gemiddeld besparen bedrijven [X]% volgens [Source]..."
-   - Case study example with real numbers
-   - Implementation timeline and savings potential
+6. **MAIN SECTION 3: ROI/Results** (100-150 words):
+   - Concrete calculations or examples
+   - Include statistic: "On average, [X]% according to [Source]..."
+   - Case study with real numbers
 
 7. **FAQ SECTION** - CRITICAL FOR AI SEARCH:
-   - Add: <h2>Veelgestelde Vragen</h2>
+   - Format: <h2>Frequently Asked Questions</h2>
    - Include 3-5 Q&A pairs in this EXACT format:
-   - <div class="faq-item"><strong>Q: [Vraag over {topic}]?</strong><p>A: [Beknopt maar volledig antwoord in 2-3 zinnen]</p></div>
+   - <div class="faq-item"><strong>Q: [Question about {topic}]?</strong><p>A: [Concise answer in 2-3 sentences]</p></div>
    - Questions should be what users actually search for
    - Answers should be direct and fact-based
 
 8. **CONCLUSION & CALL-TO-ACTION** (80-100 words):
    - Summarize key points
-   - Next steps for the reader
-   - Link to calculator or intake form
+   - Clear next steps for the reader
 
-🎯 GEO OPTIMIZATION (for AI Search visibility):
+GEO OPTIMIZATION REQUIREMENTS:
 - Include AT LEAST 3 statistics with source attribution
 - Include AT LEAST 1 expert quote with attribution
-- TL;DR section is MANDATORY (AI systems extract this!)
-- FAQ section is MANDATORY (enables FAQPage schema)
-- Use clear, scannable formatting with bullets and headers
+- TL;DR section is MANDATORY
+- FAQ section is MANDATORY
+- Use clear, scannable formatting
 - Write declarative statements that can be easily quoted
 
-CRITICAL REQUIREMENTS:
-- WRITE AT LEAST 700 WORDS - Be thorough!
-- Use primary keyword 3-4 times naturally throughout
-- Include practical Dutch warehouse/logistics terminology
-- Write in professional but accessible Dutch (B2B tone)
+CRITICAL:
+- MINIMUM 700 WORDS
+- Use primary keyword 3-4 times naturally
 - Include HTML formatting (h2, h3, ul, li, div tags)
-- Add internal linking opportunities to calculator and intake
-- Focus on ROI and cost savings
-
-⚠️ FINAL CHECK: Must be at least 700 words with TL;DR and FAQ sections!
-
-🛑 IMPORTANT: Start IMMEDIATELY with the article content. NO meta-commentary like "Here is the article" or "Below is the text".
+- Start DIRECTLY with article content - NO meta-commentary
 
 Write the complete article now:
 """
 
 CLAUDE_SPECIFIC_PROMPT = """
-🎯 MINIMUM LENGTH: 700 WORDS REQUIRED 🎯
+MINIMUM LENGTH: 700 WORDS REQUIRED
 
-Task: Write a comprehensive Dutch pallet optimization article (AT LEAST 700 words) optimized for both traditional search AND AI search engines (ChatGPT, Google AI, Perplexity).
-
-CONTEXT: You're writing for smarterpallet.com - warehouse managers need practical, ROI-focused information to reduce pallet costs.
+Write a comprehensive blog article optimized for both traditional search AND AI search engines (ChatGPT, Google AI, Perplexity).
 
 TOPIC: {topic}
-TARGET KEYWORDS: {primary_keyword}, {secondary_keywords}
+PRIMARY KEYWORD: {primary_keyword}
+SECONDARY KEYWORDS: {secondary_keywords}
 
-WRITING FRAMEWORK (Minimum 700 words, aim for 800):
+WRITING FRAMEWORK (Minimum 700 words):
 
 **SECTION 0: TL;DR SUMMARY** (50-75 words) - CRITICAL FOR AI SEARCH!
-- Format: <div class="tldr"><strong>TL;DR:</strong> [Your summary here] </div>
+- Format: <div class="tldr"><strong>TL;DR:</strong> [Summary] </div>
 - Summarize: the problem, the solution, and the key benefit
-- This is what AI assistants will extract and quote - make it impactful!
+- This is what AI assistants will extract and quote!
 
 **SECTION 1: Compelling Introduction (100-150 words)**
-- Start with a statistic + source: "Volgens [Research/Organization], [specific stat]..."
-- Establish why this matters for warehouse operations
-- Include your primary keyword "{primary_keyword}" naturally
-- Create anticipation for cost-saving solutions
+- Start with a statistic + source
+- Establish why this matters
+- Include primary keyword "{primary_keyword}" naturally
 
-**SECTION 2: Problem Analysis & Impact (150-200 words)**
-- Provide in-depth problem analysis
-- Include 1-2 statistics WITH SOURCES: "Onderzoek van [Organization] toont aan dat..."
-- Dutch context: CHEP/LPR/EPAL systems
-- Use concrete examples from Dutch warehouses
-- Weave in primary keyword 1-2 more times
+**SECTION 2: Problem Analysis (150-200 words)**
+- In-depth analysis
+- 1-2 statistics WITH SOURCES
+- Industry-specific context
+- Concrete examples
 
-**SECTION 3: Practical Solutions & Implementation (200-250 words)**
-- Detailed step-by-step implementation guide
-- Include an expert quote: "Zoals [Expert/Company] stelt: '...'"
-- Real warehouse situations and solutions
-- Best practices and efficiency tips
+**SECTION 3: Practical Solutions (200-250 words)**
+- Step-by-step guidance
+- Include an expert quote with attribution
+- Real-world examples
+- Best practices and tips
 - Common pitfalls to avoid
 - Include secondary keywords: {secondary_keywords}
 
-**SECTION 4: ROI & Business Case (100-150 words)**
-- Concrete ROI calculations with examples
-- Include statistic: "Gemiddeld besparen bedrijven [X]% volgens [Source]..."
+**SECTION 4: Results/ROI (100-150 words)**
+- Concrete examples or calculations
+- Include statistic with source
 - Case study with real numbers
-- Payback period and savings potential
 
-**SECTION 5: FAQ - Veelgestelde Vragen** - CRITICAL FOR AI SEARCH!
-- Add: <h2>Veelgestelde Vragen</h2>
+**SECTION 5: FAQ Section** - CRITICAL FOR AI SEARCH!
+- Format: <h2>Frequently Asked Questions</h2>
 - Include 3-5 Q&A pairs in this EXACT format:
-- <div class="faq-item"><strong>Q: [Vraag over {topic}]?</strong><p>A: [Beknopt maar volledig antwoord in 2-3 zinnen]</p></div>
-- Questions should be what users actually search for about this topic
+- <div class="faq-item"><strong>Q: [Question about {topic}]?</strong><p>A: [Answer in 2-3 sentences]</p></div>
+- Questions should be what users actually search for
 - Answers should be direct, fact-based, and quotable
 
 **SECTION 6: Action-Oriented Conclusion (80-100 words)**
-- Recap the most important cost-saving points
+- Recap the most important points
 - Clear next steps for the reader
-- Call-to-action to calculator or intake form
+- Call-to-action
 
-🎯 GEO OPTIMIZATION REQUIREMENTS (for AI Search visibility):
-- Include AT LEAST 3 statistics with source attribution
-- Include AT LEAST 1 expert quote with attribution
-- TL;DR section is MANDATORY (AI systems extract this!)
-- FAQ section is MANDATORY (enables FAQPage schema)
-- Use clear, scannable formatting
-- Write declarative statements that AI can easily quote
+GEO OPTIMIZATION REQUIREMENTS:
+- AT LEAST 3 statistics with source attribution
+- AT LEAST 1 expert quote with attribution
+- TL;DR section is MANDATORY
+- FAQ section is MANDATORY
+- Clear, scannable formatting
+- Declarative statements that AI can easily quote
 
 QUALITY STANDARDS:
-✅ Minimum 700 words (be comprehensive!)
-✅ Professional Dutch B2B language
-✅ Include primary keyword 3-4 times naturally
-✅ Use HTML formatting: <h2>, <h3>, <ul>, <li>, <div>
-✅ ROI and cost-savings focus
-✅ Include internal linking opportunities (calculator, intake)
-✅ Practical, actionable advice
-✅ Statistics with sources, expert quotes
+- Minimum 700 words
+- Professional tone
+- Primary keyword 3-4 times naturally
+- HTML formatting: <h2>, <h3>, <ul>, <li>, <div>
+- Practical, actionable advice
 
-🛑 NO META-COMMENTARY! Start directly with the article content, not with "Here is..." or "Below is...".
+NO META-COMMENTARY! Start directly with the article content.
 
-📝 BEGIN WRITING YOUR 700+ WORD GEO-OPTIMIZED ARTICLE NOW:
+BEGIN WRITING YOUR 700+ WORD GEO-OPTIMIZED ARTICLE NOW:
+"""
+
+# =============================================================================
+# UTILITY PROMPTS (Used internally, not for direct content generation)
+# =============================================================================
+
+INTERNAL_LINKS_PROMPT = """
+Analyze this blog article and suggest internal links.
+
+ARTICLE CONTENT: {content}
+MAIN TOPIC: {main_topic}
+AVAILABLE CATEGORIES: {available_categories}
+
+Generate 3-7 internal link suggestions with:
+1. Anchor text (natural in context)
+2. Target page topic
+3. Relevance score (1-10)
+4. Position in article (paragraph number)
+
+Format as JSON:
+[
+  {{
+    "anchor_text": "learn more about this",
+    "target_topic": "Related Topic",
+    "url": "/related-page",
+    "relevance": 9,
+    "paragraph": 3
+  }}
+]
+"""
+
+SCHEMA_MARKUP_PROMPT = """
+Generate JSON-LD schema markup for this blog article:
+
+TITLE: {title}
+CONTENT: {content_excerpt}
+AUTHOR: {author}
+PUBLISH_DATE: {publish_date}
+CATEGORY: {category}
+
+Required schema types:
+- Article
+- HowTo (if applicable for guides/tutorials)
+
+Return only the JSON-LD, no extra text.
+"""
+
+CONTENT_OPTIMIZATION_PROMPT = """
+Optimize this blog content for SEO and readability:
+
+ORIGINAL CONTENT: {original_content}
+TARGET KEYWORD: {target_keyword}
+CURRENT KEYWORD DENSITY: {current_density}%
+TARGET DENSITY: 1-2%
+
+Improvements to make:
+1. Keyword density optimization
+2. Readability improvements
+3. Header structure optimization
+4. Add call-to-action
+5. Grammar and spelling check
+
+Return the optimized version in HTML format.
+"""
+
+TOPIC_RELEVANCE_PROMPT = """
+Assess the relevance of this news article for content creation:
+
+NEWS ARTICLE: {news_content}
+TITLE: {news_title}
+
+Assessment criteria:
+1. Direct relevance to our topic (score 1-10)
+2. Value for our target audience (score 1-10)
+3. Timeliness (score 1-10)
+
+Also suggest:
+- Blog article title
+- Main topics to cover
+- Keywords to target
+
+Format as JSON:
+{{
+  "relevance_score": 8.5,
+  "direct_relevance": 9,
+  "audience_value": 8,
+  "timeliness": 8,
+  "suggested_title": "...",
+  "main_topics": ["...", "..."],
+  "target_keywords": ["...", "..."]
+}}
 """

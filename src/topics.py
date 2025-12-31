@@ -11,6 +11,13 @@ from typing import Dict, List, Optional, Tuple
 from GoogleNews import GoogleNews
 from loguru import logger
 from config.settings import GOOGLE_NEWS_CONFIG, PRODUCT_CONFIG
+from config.product_content import (
+    PRODUCT_INFO,
+    CATEGORIES,
+    TITLE_PATTERNS,
+    SEASONAL_CATEGORIES,
+    GOOGLE_NEWS as GOOGLE_NEWS_CONTENT,
+)
 import re
 
 
@@ -253,25 +260,28 @@ class TopicManager:
         }
     
     def _generate_blog_title(self, news_title: str, news_desc: str) -> Optional[str]:
-        """Generate SEO-friendly blog title from news (product-specific patterns)"""
+        """Generate SEO-friendly blog title from news (using configured patterns)"""
         content = f"{news_title} {news_desc}".lower()
+        current_year = datetime.now().year
 
-        # For SmarterPallet: pallet/logistics patterns
-        if self.product_id == "smarterpallet":
-            if "pallet" in content and "kosten" in content:
-                return f"Pallet Kosten Update: Nieuwe Ontwikkelingen {datetime.now().year}"
-            elif "warehouse" in content or "logistiek" in content:
-                return f"Warehouse Optimalisatie: Actuele Trends {datetime.now().year}"
-            elif "supply chain" in content or "keten" in content:
-                return f"Supply Chain Update: Wat Logistiek Managers Moeten Weten"
+        # Check configured title patterns
+        patterns = TITLE_PATTERNS.get("patterns", [])
+        for pattern in patterns:
+            keywords = pattern.get("keywords", [])
+            template = pattern.get("template", "")
+            # Check if any of the pattern's keywords are in the content
+            if any(keyword.lower() in content for keyword in keywords):
+                return template.format(year=current_year)
 
-            # Fallback for SmarterPallet
-            relevance_keywords = GOOGLE_NEWS_CONFIG.get("relevance_keywords", [])
-            if any(keyword in content for keyword in relevance_keywords):
-                return f"Pallet Optimalisatie: Actuele Ontwikkelingen {datetime.now().year}"
+        # Check if content matches any relevance keywords (indicates relevant topic)
+        relevance_keywords = GOOGLE_NEWS_CONTENT.get("relevance_keywords", [])
+        if relevance_keywords and any(keyword.lower() in content for keyword in relevance_keywords):
+            fallback = TITLE_PATTERNS.get("fallback", "Update: Actuele Ontwikkelingen {year}")
+            return fallback.format(year=current_year)
 
         # Generic fallback
-        return f"Update: Actuele Ontwikkelingen {datetime.now().year}"
+        fallback = TITLE_PATTERNS.get("fallback", "Update: Actuele Ontwikkelingen {year}")
+        return fallback.format(year=current_year)
     
     def _extract_keywords(self, content: str) -> List[str]:
         """Extract relevant keywords from content (product-specific)"""
@@ -288,26 +298,19 @@ class TopicManager:
         return keywords[:5]  # Limit to 5 keywords
     
     def _determine_category(self, content: str) -> str:
-        """Determine article category based on content (product-specific)"""
+        """Determine article category based on content (using configured mappings)"""
         content = content.lower()
 
-        # SmarterPallet categories
-        if self.product_id == "smarterpallet":
-            category_keywords = {
-                "pallet_kosten": ["kosten", "verlies", "prijzen", "besparing", "ROI"],
-                "optimalisatie": ["optimalisatie", "efficiency", "verbeteren", "tracking", "automatiseren"],
-                "pooling_systemen": ["CHEP", "LPR", "pooling", "depot", "contract"],
-                "case_studies": ["case", "studie", "succes", "resultaat", "implementatie"]
-            }
+        # Get category keywords from configuration
+        category_keywords = CATEGORIES.get("category_keywords", {})
 
-            for category, keywords in category_keywords.items():
-                if any(keyword in content for keyword in keywords):
-                    return category
+        # Check each category's keywords
+        for category, keywords in category_keywords.items():
+            if any(keyword.lower() in content for keyword in keywords):
+                return category
 
-            return "optimalisatie"  # Default for SmarterPallet
-
-        # Generic fallback
-        return "algemeen"
+        # Return configured default category
+        return CATEGORIES.get("default_category", "general")
     
     def _add_new_topic(self, topic: Dict) -> bool:
         """Add new topic to the collection"""
@@ -399,14 +402,14 @@ class TopicManager:
 
 # Utility functions
 def get_seasonal_category() -> str:
-    """Get appropriate category based on current season"""
+    """Get appropriate category based on current season (using configured mappings)"""
     month = datetime.now().month
-    
+
     if month in [3, 4, 5]:  # Spring
-        return "planten"  # Focus on flora/plants
+        return SEASONAL_CATEGORIES.get("spring", "general")
     elif month in [6, 7, 8]:  # Summer
-        return "examenvorbereiding"  # Exam preparation season
+        return SEASONAL_CATEGORIES.get("summer", "general")
     elif month in [9, 10, 11]:  # Autumn
-        return "wild"  # Hunting season
+        return SEASONAL_CATEGORIES.get("autumn", "general")
     else:  # Winter
-        return "veiligheid"  # Safety focus 
+        return SEASONAL_CATEGORIES.get("winter", "general") 

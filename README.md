@@ -12,7 +12,7 @@ A reusable, automated blog content generation system with **SEO optimization**, 
 - **Supabase Integration**: Scalable PostgreSQL database with real-time capabilities
 - **Railway Deployment**: One-click deployment with continuous mode
 - **Quality Assurance**: Automated content validation, SEO scoring (target: 85+)
-- **Multi-Language**: Default Dutch setup (easily adaptable to any language)
+- **Multi-Language**: Supports any language (configure in product_content.py)
 
 ### 🤖 GEO (Generative Engine Optimization) - NEW!
 - **AI Search Visibility**: Optimized for ChatGPT, Google AI Overviews, and Perplexity
@@ -35,19 +35,44 @@ cp -r seo_system_blank my_project_seo
 cd my_project_seo
 ```
 
-### 2. Configure Your Product
+### 2. Configure Your Product (Single File!)
 
-Edit `config/settings.py`:
+All product-specific configuration is now in **one file**: `config/product_content.py`
+
+```bash
+# Copy the template
+cp config/product_content_template.py config/product_content.py
+```
+
+Then edit `config/product_content.py` with your product's:
 
 ```python
-PRODUCT_CONFIG = {
-    "product_id": "YOUR_PRODUCT_ID",              # e.g., "myproduct"
-    "website_domain": "YOUR_DOMAIN.com",          # e.g., "example.com"
-    "base_url": "https://YOUR_DOMAIN.com",
-    "company_name": "Your Company Name",
-    "parent_company": "Parent Company Name"
+PRODUCT_INFO = {
+    "product_id": "myproduct",           # Unique ID (lowercase, no spaces)
+    "company_name": "My Company",        # Display name
+    "website_domain": "mysite.com",
+    "base_url": "https://mysite.com",
+    "default_author": "My Expert",
+    # ... more settings
 }
+
+SYSTEM_PROMPTS = {
+    "openai": "Je bent een expert in [YOUR NICHE]...",
+    "claude": "Je bent een consultant gespecialiseerd in...",
+}
+
+INTERNAL_LINKS = {
+    "landing_links": [...],   # CTAs to your main pages
+    "related_topics": {...},  # Category-specific blog links
+}
+
+CATEGORIES = {
+    "category_keywords": {...},  # Auto-categorization rules
+}
+# ... and more (SEO content, title patterns, Google News config)
 ```
+
+The template file (`product_content_template.py`) includes detailed examples and validation!
 
 ### 3. Create Your Topics
 
@@ -59,13 +84,14 @@ cp data/topics_template.json data/topics_myproduct.json
 
 Edit the topics file with your industry-specific topics.
 
-### 4. Customize Content Prompts
+### 4. Customize Prompt Templates (Optional)
 
-Edit `config/prompts.py` to match your:
-- Industry/niche
-- Target audience
-- Tone of voice
-- Content structure
+The main AI prompts are now in `config/product_content.py` (SYSTEM_PROMPTS section).
+
+For advanced prompt customization, you can also edit `config/prompts.py` for:
+- Blog structure templates
+- Meta description generation
+- Additional prompt variations
 
 ### 5. Setup Database
 
@@ -92,8 +118,10 @@ Add environment variables in Railway.
 ```
 seo_system_blank/
 ├── config/
-│   ├── settings.py          # Product config, SEO settings, GEO config
-│   └── prompts.py           # AI prompts (with GEO instructions)
+│   ├── product_content.py       # ⭐ MAIN CONFIG - All product-specific content
+│   ├── product_content_template.py  # Template with examples
+│   ├── settings.py              # Technical settings (API, DB, rate limits)
+│   └── prompts.py               # AI prompt templates
 ├── src/
 │   ├── generator.py         # Content generation + GEO extraction
 │   ├── seo.py               # SEO/GEO optimization engine
@@ -108,9 +136,7 @@ seo_system_blank/
 ├── health_server.py         # Health endpoint for Railway
 ├── database_schema.sql      # Supabase table setup (includes GEO fields)
 ├── requirements.txt         # Python dependencies
-├── env.example              # Environment variables template
-├── FRONTEND_INTEGRATION_GUIDE.md   # Frontend component guide
-└── FRONTEND_DATABASE_SCHEMA_GUIDE.md # Database schema reference
+└── env.example              # Environment variables template
 ```
 
 ---
@@ -119,15 +145,26 @@ seo_system_blank/
 
 When setting up for a new project:
 
-- [ ] Update `PRODUCT_CONFIG` in `config/settings.py`
-- [ ] Update `SEO_CONFIG` in `config/settings.py`
-- [ ] Review `GEO_CONFIG` in `config/settings.py` (enable/disable features)
-- [ ] Customize `config/prompts.py` for your industry
-- [ ] Create `data/topics_[product_id].json` with your topics (copy from template)
-- [ ] Run `database_schema.sql` in Supabase (includes GEO fields)
-- [ ] Set all environment variables in Railway
-- [ ] Test locally first with `python main.py`
-- [ ] Deploy to Railway with `railway up`
+### Step 1: Product Configuration (Single File!)
+- [ ] Copy `config/product_content_template.py` → `config/product_content.py`
+- [ ] Fill in all 8 sections in `product_content.py`:
+  - [ ] PRODUCT_INFO (company name, domain, author)
+  - [ ] SYSTEM_PROMPTS (OpenAI and Claude prompts)
+  - [ ] SEO_CONTENT (audience, meta templates, schema)
+  - [ ] INTERNAL_LINKS (CTAs and related blog links)
+  - [ ] CATEGORIES (keyword-to-category mappings)
+  - [ ] TITLE_PATTERNS (auto title generation)
+  - [ ] SEASONAL_CATEGORIES (optional)
+  - [ ] GOOGLE_NEWS (if using news discovery)
+
+### Step 2: Topics & Database
+- [ ] Create `data/topics_[product_id].json` (copy from template)
+- [ ] Run `database_schema.sql` in Supabase
+
+### Step 3: Environment & Deployment
+- [ ] Set environment variables (API keys, Supabase credentials)
+- [ ] Test locally: `python main.py`
+- [ ] Deploy to Railway: `railway up`
 - [ ] Verify first article has GEO elements (TL;DR, FAQ, statistics)
 
 ---
@@ -264,14 +301,64 @@ ORDER BY published_at DESC;
 
 ---
 
+## 🖥️ Frontend Integration
+
+### Fetching Articles
+
+```sql
+-- Get published articles for your product
+SELECT * FROM blog_articles
+WHERE product_id = 'yourproduct'
+  AND status = 'published'
+ORDER BY published_at DESC;
+```
+
+### Database Fields Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title`, `content`, `excerpt` | TEXT | Core article content (HTML) |
+| `slug` | TEXT | URL path (unique per product) |
+| `meta_description` | TEXT | SEO meta tag (120-160 chars) |
+| `cover_image_url`, `cover_image_alt` | TEXT | Featured image + alt text |
+| `author`, `read_time`, `category` | TEXT/INT | Article metadata |
+| `published_at` | TIMESTAMP | Publication date (ISO 8601) |
+| `primary_keyword`, `secondary_keywords` | TEXT/TEXT[] | SEO keywords |
+| `tags` | TEXT[] | Topic tags array |
+
+### GEO Fields (AI Search Optimization)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tldr` | TEXT | AI-extractable summary (50-75 words) |
+| `faq_items` | JSONB | `[{question, answer}]` - FAQ section |
+| `faq_schema` | JSONB | FAQPage JSON-LD schema |
+| `cited_statistics` | JSONB | `[{statistic, source}]` - Facts with sources |
+| `citations` | JSONB | `[{quote, source}]` - Expert quotes |
+| `schema_markup` | JSONB | Article/HowTo schema |
+| `geo_optimized` | BOOLEAN | GEO optimization flag |
+
+### Frontend Rendering Tips
+
+1. **TL;DR** - Display prominently at article start for AI extraction
+2. **FAQ Section** - Render `faq_items` as collapsible accordion
+3. **Schema Markup** - Inject `faq_schema` and `schema_markup` in `<head>`:
+   ```html
+   <script type="application/ld+json">
+     {{ article.faq_schema | json }}
+   </script>
+   ```
+4. **Statistics** - Highlight `cited_statistics` with source attribution
+5. **Content** - The `content` field is HTML - sanitize before rendering
+
+---
+
 ## 📚 Documentation Files
 
-- `QUICKSTART.md` - Step-by-step setup guide
+- `config/product_content_template.py` - **⭐ Main config template with examples**
 - `database_schema.sql` - Database setup SQL (with GEO fields)
 - `env.example` - Environment variables template
 - `data/topics_template.json` - Topic file template
-- `FRONTEND_INTEGRATION_GUIDE.md` - Frontend components & GEO rendering
-- `FRONTEND_DATABASE_SCHEMA_GUIDE.md` - Database schema reference for frontends
 
 ---
 
@@ -309,5 +396,5 @@ ORDER BY published_at DESC;
 
 **Built with ❤️ for automated content marketing**
 
-**Version**: 2.0.0 (GEO-enabled)
-**Last Updated**: 2025-12-21
+**Version**: 2.2.0 (Language-Agnostic Template)
+**Last Updated**: 2025-12-29

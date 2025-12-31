@@ -1,15 +1,21 @@
--- Complete blog_articles table creation for multi-product blog system
+-- =============================================================================
+-- BLOG ARTICLES TABLE - Multi-Product SEO/GEO Blog System
+-- =============================================================================
 -- Run this in your Supabase SQL editor
+--
+-- NOTE: This schema has NO hardcoded product defaults.
+-- All product-specific values (product_id, author, language) are set by the
+-- Python backend from config/product_content.py
+-- =============================================================================
 
--- Create blog_articles table
 CREATE TABLE IF NOT EXISTS public.blog_articles (
     -- Primary identification
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug TEXT NOT NULL,
 
-    -- Multi-product fields
-    product_id TEXT NOT NULL DEFAULT 'smarterpallet',
-    website_domain TEXT NOT NULL DEFAULT 'smarterpallet.com',
+    -- Multi-product fields (NO DEFAULTS - set by backend)
+    product_id TEXT NOT NULL,
+    website_domain TEXT NOT NULL,
 
     -- Core content
     title TEXT NOT NULL,
@@ -39,8 +45,8 @@ CREATE TABLE IF NOT EXISTS public.blog_articles (
     -- Status & Publishing
     status TEXT DEFAULT 'published' CHECK (status IN ('draft', 'published', 'archived', 'deleted')),
 
-    -- Author & Content Info
-    author TEXT DEFAULT 'SmarterPallet Expert',
+    -- Author & Content Info (NO DEFAULTS - set by backend from config)
+    author TEXT,
     read_time INTEGER DEFAULT 5,
     category TEXT,
     topic_id TEXT,
@@ -48,9 +54,9 @@ CREATE TABLE IF NOT EXISTS public.blog_articles (
     -- Quality Metrics
     seo_score INTEGER,
 
-    -- Localization
-    geo_targeting TEXT[] DEFAULT ARRAY['Nederland', 'België'],
-    language TEXT DEFAULT 'nl-NL',
+    -- Localization (NO DEFAULTS - set by backend from config)
+    geo_targeting TEXT[],
+    language TEXT,
 
     -- GEO (Generative Engine Optimization) Fields
     -- For AI search visibility (ChatGPT, Google AI, Perplexity)
@@ -129,15 +135,17 @@ ORDER BY ordinal_position;
 -- ALTER TABLE public.blog_articles ADD COLUMN IF NOT EXISTS faq_schema JSONB DEFAULT '{}'::JSONB;
 
 -- Test insert (optional - will be done by Python backend)
+-- Replace YOUR_PRODUCT_ID, your-domain.com, etc. with your actual values
 -- INSERT INTO public.blog_articles (
---     title, slug, content, excerpt, product_id, website_domain, category, author
+--     title, slug, content, excerpt, product_id, website_domain, category, author, language
 -- ) VALUES (
 --     'Test Article',
 --     'test-article',
 --     '<p>Test content</p>',
 --     'Test excerpt',
---     'smarterpallet',
---     'smarterpallet.com',
---     'optimalisatie',
---     'SmarterPallet Expert'
+--     'YOUR_PRODUCT_ID',
+--     'your-domain.com',
+--     'general',
+--     'Your Author Name',
+--     'en-US'
 -- );

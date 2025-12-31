@@ -22,3 +22,12 @@ tenacity==8.2.3
 # Utilities
 loguru==0.7.2
 pytz==2025.2
+
+# HTML Processing
+beautifulsoup4==4.12.3
+
+# Scheduling
+schedule==1.2.0
+
+# News Discovery (optional)
+GoogleNews==1.6.14

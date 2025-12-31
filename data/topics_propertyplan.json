@@ -1,0 +1,288 @@
+{
+  "topics": [
+    {
+      "id": 1,
+      "title": "How to Create Compelling Investor Presentations for Real Estate Development Projects",
+      "category": "investor_presentations",
+      "keywords": ["investor presentation", "real estate development", "pitch deck", "fundraising", "capital raising"],
+      "priority": 10,
+      "difficulty": "medium",
+      "target_audience": "real estate developers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 2,
+      "title": "3D Visualization for Real Estate: Why Investors Want to See Projects in Three Dimensions",
+      "category": "visualization",
+      "keywords": ["3D visualization", "real estate", "investor presentations", "Mapbox", "terrain visualization"],
+      "priority": 10,
+      "difficulty": "medium",
+      "target_audience": "developers and investors",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 3,
+      "title": "Scenario Planning for Development Projects: Presenting Multiple Strategic Options to Investors",
+      "category": "scenario_planning",
+      "keywords": ["scenario planning", "development strategy", "investor options", "project alternatives"],
+      "priority": 9,
+      "difficulty": "advanced",
+      "target_audience": "investment managers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 4,
+      "title": "The Complete Guide to Phased Development: How to Present Project Timelines to Investors",
+      "category": "development_process",
+      "keywords": ["phased development", "project timeline", "investor communication", "development phases"],
+      "priority": 9,
+      "difficulty": "medium",
+      "target_audience": "real estate developers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 5,
+      "title": "Interactive Maps vs Static Renders: Which Works Better for Investor Presentations?",
+      "category": "visualization",
+      "keywords": ["interactive maps", "3D renders", "investor presentations", "visualization comparison"],
+      "priority": 8,
+      "difficulty": "basis",
+      "target_audience": "developers",
+      "business_value": "medium",
+      "used": false
+    },
+    {
+      "id": 6,
+      "title": "PropTech Tools for Real Estate Developers: A 2025 Overview",
+      "category": "proptech",
+      "keywords": ["PropTech", "real estate technology", "developer tools", "digital transformation"],
+      "priority": 8,
+      "difficulty": "basis",
+      "target_audience": "developers",
+      "business_value": "medium",
+      "used": false
+    },
+    {
+      "id": 7,
+      "title": "How to Present Empty Land Development Projects: Visualizing the Vision",
+      "category": "visualization",
+      "keywords": ["empty land", "greenfield development", "land visualization", "terrain presentation"],
+      "priority": 9,
+      "difficulty": "medium",
+      "target_audience": "land developers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 8,
+      "title": "Layer-Based Storytelling: How to Build Compelling Development Narratives",
+      "category": "visualization",
+      "keywords": ["layer visualization", "development storytelling", "map layers", "visual narrative"],
+      "priority": 8,
+      "difficulty": "medium",
+      "target_audience": "developers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 9,
+      "title": "What Investors Actually Want to See in Development Presentations",
+      "category": "investor_presentations",
+      "keywords": ["investor expectations", "development presentation", "pitch requirements", "investor due diligence"],
+      "priority": 10,
+      "difficulty": "medium",
+      "target_audience": "developers seeking funding",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 10,
+      "title": "Marina and Coastal Development: Presentation Strategies for Complex Projects",
+      "category": "case_studies",
+      "keywords": ["marina development", "coastal projects", "waterfront presentation", "complex developments"],
+      "priority": 7,
+      "difficulty": "advanced",
+      "target_audience": "coastal developers",
+      "business_value": "medium",
+      "used": false
+    },
+    {
+      "id": 11,
+      "title": "Mixed-Use Development Presentations: Showing Multiple Uses on One Site",
+      "category": "development_process",
+      "keywords": ["mixed-use development", "multi-use projects", "development presentation", "zoning visualization"],
+      "priority": 8,
+      "difficulty": "medium",
+      "target_audience": "urban developers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 12,
+      "title": "How to Use 3D Terrain Maps to Show Site Advantages to Investors",
+      "category": "visualization",
+      "keywords": ["3D terrain", "site advantages", "topography visualization", "Mapbox terrain"],
+      "priority": 9,
+      "difficulty": "medium",
+      "target_audience": "developers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 13,
+      "title": "Investor Access Control: Sharing the Right Information with the Right Stakeholders",
+      "category": "investor_presentations",
+      "keywords": ["access control", "stakeholder management", "investor portal", "secure sharing"],
+      "priority": 7,
+      "difficulty": "basis",
+      "target_audience": "developers and consultants",
+      "business_value": "medium",
+      "used": false
+    },
+    {
+      "id": 14,
+      "title": "Comparing Development Scenarios: How to Present Alternatives Side by Side",
+      "category": "scenario_planning",
+      "keywords": ["scenario comparison", "development alternatives", "investor decision-making", "option analysis"],
+      "priority": 8,
+      "difficulty": "medium",
+      "target_audience": "investment managers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 15,
+      "title": "The Role of GIS and Mapping Technology in Modern Real Estate Development",
+      "category": "proptech",
+      "keywords": ["GIS", "mapping technology", "real estate GIS", "spatial analysis"],
+      "priority": 7,
+      "difficulty": "medium",
+      "target_audience": "tech-forward developers",
+      "business_value": "medium",
+      "used": false
+    },
+    {
+      "id": 16,
+      "title": "Building Investor Confidence Through Visual Project Documentation",
+      "category": "investor_presentations",
+      "keywords": ["investor confidence", "visual documentation", "project transparency", "due diligence materials"],
+      "priority": 8,
+      "difficulty": "medium",
+      "target_audience": "developers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 17,
+      "title": "Resort and Hospitality Development: Presenting Tourism Projects to Investors",
+      "category": "case_studies",
+      "keywords": ["resort development", "hospitality projects", "tourism investment", "resort presentation"],
+      "priority": 7,
+      "difficulty": "advanced",
+      "target_audience": "hospitality developers",
+      "business_value": "medium",
+      "used": false
+    },
+    {
+      "id": 18,
+      "title": "Digital Transformation in Real Estate Development: From PDFs to Interactive Presentations",
+      "category": "proptech",
+      "keywords": ["digital transformation", "interactive presentations", "real estate innovation", "PDF alternatives"],
+      "priority": 8,
+      "difficulty": "basis",
+      "target_audience": "traditional developers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 19,
+      "title": "How to Present Infrastructure and Utilities Planning to Investors",
+      "category": "development_process",
+      "keywords": ["infrastructure planning", "utilities", "development infrastructure", "investor communication"],
+      "priority": 6,
+      "difficulty": "advanced",
+      "target_audience": "infrastructure developers",
+      "business_value": "medium",
+      "used": false
+    },
+    {
+      "id": 20,
+      "title": "Self-Service Project Visualization: Empowering Developers Without Technical Skills",
+      "category": "proptech",
+      "keywords": ["self-service", "no-code visualization", "developer tools", "easy-to-use software"],
+      "priority": 9,
+      "difficulty": "basis",
+      "target_audience": "non-technical developers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 21,
+      "title": "Hillside and Mountain Development: Presenting Projects with Complex Terrain",
+      "category": "visualization",
+      "keywords": ["hillside development", "mountain terrain", "elevation visualization", "slope analysis"],
+      "priority": 7,
+      "difficulty": "advanced",
+      "target_audience": "mountain developers",
+      "business_value": "medium",
+      "used": false
+    },
+    {
+      "id": 22,
+      "title": "The Investor Viewer Experience: What Makes a Great Project Presentation",
+      "category": "investor_presentations",
+      "keywords": ["investor experience", "viewer interface", "presentation UX", "investor engagement"],
+      "priority": 8,
+      "difficulty": "medium",
+      "target_audience": "developers",
+      "business_value": "high",
+      "used": false
+    },
+    {
+      "id": 23,
+      "title": "Zoning and Land Use Visualization: Communicating Regulatory Context to Investors",
+      "category": "development_process",
+      "keywords": ["zoning visualization", "land use", "regulatory compliance", "planning context"],
+      "priority": 7,
+      "difficulty": "medium",
+      "target_audience": "developers",
+      "business_value": "medium",
+      "used": false
+    },
+    {
+      "id": 24,
+      "title": "Greenfield vs Brownfield: Different Presentation Approaches for Different Projects",
+      "category": "development_process",
+      "keywords": ["greenfield development", "brownfield development", "site types", "presentation strategies"],
+      "priority": 6,
+      "difficulty": "medium",
+      "target_audience": "all developers",
+      "business_value": "medium",
+      "used": false
+    },
+    {
+      "id": 25,
+      "title": "How to Show ROI and Financial Metrics Alongside Visual Project Plans",
+      "category": "investor_presentations",
+      "keywords": ["ROI visualization", "financial metrics", "investor returns", "project economics"],
+      "priority": 9,
+      "difficulty": "advanced",
+      "target_audience": "investment managers",
+      "business_value": "high",
+      "used": false
+    }
+  ],
+  "categories": [
+    "investor_presentations",
+    "visualization",
+    "scenario_planning",
+    "development_process",
+    "proptech",
+    "case_studies"
+  ],
+  "last_updated": "2025-12-28"
+}

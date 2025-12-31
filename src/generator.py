@@ -1,6 +1,6 @@
 """
-Content Generator for SmarterPallet Blog
-Alternates between OpenAI and Claude APIs to generate Dutch pallet optimization articles
+Content Generator for Multi-Product Blog System
+Alternates between OpenAI and Claude APIs to generate SEO-optimized articles
 """
 
 import asyncio
@@ -23,6 +23,12 @@ from config.prompts import (
     META_DESCRIPTION_PROMPT,
     OPENAI_SPECIFIC_PROMPT,
     CLAUDE_SPECIFIC_PROMPT
+)
+from config.product_content import (
+    PRODUCT_INFO,
+    SYSTEM_PROMPTS,
+    SEO_CONTENT,
+    get_author
 )
 
 
@@ -62,10 +68,10 @@ class ContentGenerator:
         self.last_used_api = "openai"  # Start with OpenAI, so first call uses Claude (more reliable)
         self.api_usage_count = {"openai": 0, "claude": 0}
         
-    async def generate_article(self, topic: Dict, attempt: int = 1) -> Optional[Dict]:
-        """Generate a complete blog article from topic with max 2 attempts"""
+    async def generate_article(self, topic: Dict) -> Optional[Dict]:
+        """Generate a complete blog article from topic"""
         try:
-            logger.info(f"Generating article for topic: {topic['title']} (Attempt {attempt}/2)")
+            logger.info(f"Generating article for topic: {topic['title']}")
             
             # Select API to use
             api_to_use = self._get_next_api()
@@ -84,17 +90,10 @@ class ContentGenerator:
             
             # Parse generated content
             article_data = self._parse_generated_content(content_result, topic)
-            
-            # Quality assurance check with strict retry limit
-            max_attempts = ERROR_HANDLING.get("content_validation_errors", {}).get("max_regeneration_attempts", 2)
-            if not self._passes_qa_check(article_data):
-                if attempt < max_attempts:
-                    logger.warning(f"Article failed QA check, making attempt {attempt + 1}/{max_attempts}")
-                    return await self.generate_article(topic, attempt + 1)
-                else:
-                    logger.warning(f"Article failed QA after {max_attempts} attempts, accepting as-is to save costs")
-                    # Accept the article even if it fails QA after max attempts
-            
+
+            # QA check removed to save API costs - articles are accepted as-is
+            # The AI models produce quality content, so regeneration is unnecessary
+
             # Generate additional metadata
             article_data = await self._enhance_article_metadata(article_data)
             
@@ -153,7 +152,7 @@ class ContentGenerator:
             response = self.openai_client.chat.completions.create(
                 model=API_CONFIG["openai"]["model"],
                 messages=[
-                    {"role": "system", "content": "Je bent een expert in warehouse logistics en pallet cost optimization. Je MOET altijd artikelen van minimaal 700 woorden schrijven voor logistiek managers in Nederland. Focus op ROI, kostenbesparing en praktische implementatie. Schrijf uitgebreid, data-gedreven en informatief met concrete cijfers."},
+                    {"role": "system", "content": SYSTEM_PROMPTS["openai"]},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=API_CONFIG["openai"]["temperature"],
@@ -181,7 +180,7 @@ class ContentGenerator:
                 max_tokens=API_CONFIG["claude"]["max_tokens"],
                 temperature=API_CONFIG["claude"]["temperature"],
                 top_p=API_CONFIG["claude"]["top_p"],
-                system="Je bent een consultant gespecialiseerd in pallet cost optimization en warehouse efficiency voor Nederlandse bedrijven. Je schrijft data-gedreven, uitgebreide artikelen van minimaal 700 woorden met concrete ROI voorbeelden en praktische implementatie tips. Focus op kostenbesparing, operationele efficiency en business value voor logistiek managers.",
+                system=SYSTEM_PROMPTS["claude"],
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
@@ -282,11 +281,11 @@ class ContentGenerator:
             "tags": topic.get("keywords", []),
             "primary_keyword": topic["keywords"][0] if topic["keywords"] else title.split()[0],
             "secondary_keywords": topic["keywords"][1:] if len(topic["keywords"]) > 1 else [],
-            "category": topic.get("category", "algemeen"),
+            "category": topic.get("category", SEO_CONTENT.get("default_category", "general")),
             "topic_id": topic["id"],
             "read_time": reading_time,
-            "language": "nl-NL",
-            "author": "SmarterPallet Expert",
+            "language": PRODUCT_INFO["language"],
+            "author": get_author(),
             "created_at": datetime.now().isoformat(),
             # GEO (Generative Engine Optimization) fields
             "tldr": geo_elements.get("tldr"),
@@ -624,8 +623,9 @@ class ContentGenerator:
         except Exception as e:
             logger.error(f"Error generating meta description: {e}")
         
-        # Fallback to automatic generation
-        return f"Ontdek hoe {article['primary_keyword']} uw palletkosten verlaagt. ✓ Praktische tips ✓ ROI voorbeelden ✓ 2025. Bespaar €3K-€15K per maand!"
+        # Fallback to automatic generation using configured template
+        fallback_template = SEO_CONTENT.get("fallback_meta_template", "Learn about {keyword}. ✓ Expert tips ✓ Examples ✓ 2025 Guide.")
+        return fallback_template.format(keyword=article['primary_keyword'])
     
     async def _generate_exam_questions(self, article: Dict) -> List[Dict]:
         """Generate exam questions based on article content"""
@@ -715,18 +715,6 @@ class ContentGenerator:
 
 
 # Utility functions for content validation
-def validate_dutch_content(content: str) -> bool:
-    """Validate that content is in Dutch language"""
-    try:
-        from langdetect import detect
-        return detect(content) == 'nl'
-    except:
-        # Fallback: check for common Dutch words
-        dutch_indicators = ['de', 'het', 'een', 'van', 'in', 'voor', 'met', 'op', 'te', 'is']
-        content_lower = content.lower()
-        dutch_word_count = sum(1 for word in dutch_indicators if word in content_lower)
-        return dutch_word_count >= 3
-    
 def extract_internal_link_opportunities(content: str, available_topics: List[str]) -> List[Dict]:
     """Extract opportunities for internal linking"""
     opportunities = []
