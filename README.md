@@ -1,400 +1,518 @@
-# 🚀 AI-Powered SEO + GEO Blog System (Template)
+# SEO Content Management System
 
-A reusable, automated blog content generation system with **SEO optimization**, **GEO (Generative Engine Optimization)** for AI search visibility, multi-product support, and daily publishing capabilities.
+A centralized, multi-website SEO content generation platform with AI-powered article creation, topic discovery, and automated publishing.
 
-## ✨ Features
+## Overview
 
-### Core Features
-- **AI Content Generation**: Alternates between OpenAI GPT-4 and Claude Opus for diverse, high-quality articles
-- **SEO Optimized**: Schema.org markup, meta tags, internal linking, keyword optimization
-- **Multi-Product Support**: Single database, multiple websites/products with product_id filtering
-- **Daily Publishing**: Automated article generation on configurable schedules
-- **Supabase Integration**: Scalable PostgreSQL database with real-time capabilities
-- **Railway Deployment**: One-click deployment with continuous mode
-- **Quality Assurance**: Automated content validation, SEO scoring (target: 85+)
-- **Multi-Language**: Supports any language (configure in product_content.py)
+This system provides a **unified dashboard** to manage multiple websites, each with their own:
+- AI-generated blog articles (GPT-4o + Claude Sonnet 4)
+- Topic management with AI discovery
+- SEO optimization with GEO (Generative Engine Optimization)
+- Automated scheduling and publishing
 
-### 🤖 GEO (Generative Engine Optimization) - NEW!
-- **AI Search Visibility**: Optimized for ChatGPT, Google AI Overviews, and Perplexity
-- **TL;DR Summaries**: Auto-extracted 50-75 word summaries AI systems can cite directly
-- **FAQPage Schema**: Structured Q&A sections with JSON-LD markup (+35-40% AI citation rate)
-- **Statistics with Sources**: Cited statistics that build trust signals (+40% visibility)
-- **Expert Quotes**: Authority signals through attributed expert citations (+35% visibility)
-- **Enhanced Scoring**: SEO score includes 35 points for GEO optimization factors
+**Live Dashboard**: https://seo-dashboard.ta-voeten.workers.dev
+**Content Worker**: https://seo-content-generator.ta-voeten.workers.dev
 
 ---
 
-## 🎯 Quick Start
+## Architecture
 
-### 1. Clone & Customize
-
-```bash
-# Copy this template to your project
-cp -r seo_system_blank my_project_seo
-
-cd my_project_seo
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CLOUDFLARE WORKERS                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌────────────────────┐         ┌─────────────────────────┐     │
+│  │   SEO Dashboard    │         │  Content Generator      │     │
+│  │   (Next.js 15)     │         │  (Python Worker)        │     │
+│  │                    │         │                         │     │
+│  │  • Website CRUD    │   API   │  • Article generation   │     │
+│  │  • Topic mgmt      │◄───────►│  • Topic discovery      │     │
+│  │  • API key config  │         │  • SEO optimization     │     │
+│  │  • Generation logs │         │  • Scheduled publishing │     │
+│  │  • Auth (Supabase) │         │  • GEO enhancement      │     │
+│  └─────────┬──────────┘         └───────────┬─────────────┘     │
+│            │                                 │                   │
+└────────────┼─────────────────────────────────┼───────────────────┘
+             │                                 │
+             │         ┌───────────────────────┼───────────────────┐
+             │         │     CENTRAL SUPABASE                      │
+             │         │                                           │
+             └────────►│  ┌──────────┐  ┌──────────┐  ┌─────────┐ │
+                       │  │ websites │  │  topics  │  │api_keys │ │
+                       │  │          │  │          │  │(encrypt)│ │
+                       │  └──────────┘  └──────────┘  └─────────┘ │
+                       │  ┌──────────────┐  ┌───────────────────┐ │
+                       │  │generation_   │  │  worker_status    │ │
+                       │  │logs          │  │                   │ │
+                       │  └──────────────┘  └───────────────────┘ │
+                       └──────────────────────┬────────────────────┘
+                                              │
+                        ┌─────────────────────┼─────────────────────┐
+                        │                     │                     │
+                        ▼                     ▼                     ▼
+                  ┌──────────┐         ┌──────────┐         ┌──────────┐
+                  │ Website  │         │ Website  │         │ Website  │
+                  │    A     │         │    B     │         │    C     │
+                  │ Supabase │         │ Supabase │         │ Supabase │
+                  │(articles)│         │(articles)│         │(articles)│
+                  └──────────┘         └──────────┘         └──────────┘
 ```
 
-### 2. Configure Your Product (Single File!)
+### Data Flow
 
-All product-specific configuration is now in **one file**: `config/product_content.py`
-
-```bash
-# Copy the template
-cp config/product_content_template.py config/product_content.py
-```
-
-Then edit `config/product_content.py` with your product's:
-
-```python
-PRODUCT_INFO = {
-    "product_id": "myproduct",           # Unique ID (lowercase, no spaces)
-    "company_name": "My Company",        # Display name
-    "website_domain": "mysite.com",
-    "base_url": "https://mysite.com",
-    "default_author": "My Expert",
-    # ... more settings
-}
-
-SYSTEM_PROMPTS = {
-    "openai": "Je bent een expert in [YOUR NICHE]...",
-    "claude": "Je bent een consultant gespecialiseerd in...",
-}
-
-INTERNAL_LINKS = {
-    "landing_links": [...],   # CTAs to your main pages
-    "related_topics": {...},  # Category-specific blog links
-}
-
-CATEGORIES = {
-    "category_keywords": {...},  # Auto-categorization rules
-}
-# ... and more (SEO content, title patterns, Google News config)
-```
-
-The template file (`product_content_template.py`) includes detailed examples and validation!
-
-### 3. Create Your Topics
-
-Copy and customize `data/topics_template.json` → `data/topics_YOUR_PRODUCT_ID.json`
-
-```bash
-cp data/topics_template.json data/topics_myproduct.json
-```
-
-Edit the topics file with your industry-specific topics.
-
-### 4. Customize Prompt Templates (Optional)
-
-The main AI prompts are now in `config/product_content.py` (SYSTEM_PROMPTS section).
-
-For advanced prompt customization, you can also edit `config/prompts.py` for:
-- Blog structure templates
-- Meta description generation
-- Additional prompt variations
-
-### 5. Setup Database
-
-Run `database_schema.sql` in your Supabase SQL Editor.
-
-### 6. Deploy to Railway
-
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Login and deploy
-railway login
-railway init
-railway up
-```
-
-Add environment variables in Railway.
+1. **User** manages websites and topics via the Dashboard
+2. **Dashboard** stores configuration in Central Supabase (encrypted API keys)
+3. **Worker** polls for scheduled websites every hour (cron)
+4. **Worker** generates articles using per-website API keys
+5. **Worker** publishes articles directly to each website's own Supabase
+6. **Worker** logs generation results back to Central Supabase
 
 ---
 
-## 📁 Project Structure
+## Tech Stack
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Dashboard** | Next.js 15, Tailwind CSS, shadcn/ui | Website management UI |
+| **Worker** | Python (Pyodide), Cloudflare Workers | Content generation |
+| **Central DB** | Supabase (PostgreSQL) | Config, topics, logs |
+| **Target DBs** | Supabase (per website) | Article storage |
+| **Auth** | Supabase Auth | User authentication |
+| **AI Models** | GPT-4o, Claude Sonnet 4 | Content generation |
+| **Encryption** | AES-256-GCM | API key security |
+
+---
+
+## Features
+
+### Dashboard Features
+- **Multi-website management** - Add, configure, and monitor multiple websites
+- **Topic management** - Manual add, bulk import, priority adjustment
+- **AI Topic Discovery** - GPT-4o powered trending topic discovery
+- **API key management** - Secure encrypted storage for OpenAI/Anthropic keys
+- **Generation logs** - View article generation history and errors
+- **Scheduling** - Configure days between posts and preferred times
+
+### Worker Features
+- **Dual AI support** - Alternates between GPT-4o and Claude Sonnet 4
+- **SEO optimization** - Meta tags, keywords, internal linking
+- **GEO optimization** - TL;DR, FAQ schema, cited statistics, expert quotes
+- **Topic reuse** - Configurable max uses per topic before marking as used
+- **Auto topic generation** - Generate topics with AI when queue is empty
+- **Hourly cron** - Automatic scheduled article generation
+
+### Security Features
+- **Encrypted API keys** - AES-256-GCM encryption at rest
+- **Row Level Security** - Users only access their own data
+- **Service role isolation** - Admin keys never exposed to client
+
+---
+
+## Project Structure
 
 ```
 seo_system_blank/
-├── config/
-│   ├── product_content.py       # ⭐ MAIN CONFIG - All product-specific content
-│   ├── product_content_template.py  # Template with examples
-│   ├── settings.py              # Technical settings (API, DB, rate limits)
-│   └── prompts.py               # AI prompt templates
-├── src/
-│   ├── generator.py         # Content generation + GEO extraction
-│   ├── seo.py               # SEO/GEO optimization engine
-│   ├── database.py          # Supabase integration
-│   ├── topics.py            # Topic management
-│   └── utils.py             # Logging & utilities
-├── data/
-│   ├── topics_template.json # TEMPLATE: Copy & customize this
-│   └── published.json       # Auto-generated: tracks published articles
-├── railway_worker.py        # Main worker for Railway deployment
-├── main.py                  # Local testing/development
-├── health_server.py         # Health endpoint for Railway
-├── database_schema.sql      # Supabase table setup (includes GEO fields)
-├── requirements.txt         # Python dependencies
-└── env.example              # Environment variables template
+├── dashboard/                    # Next.js Dashboard Application
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── (auth)/          # Login/Signup pages
+│   │   │   ├── (dashboard)/     # Protected dashboard routes
+│   │   │   │   └── dashboard/
+│   │   │   │       ├── page.tsx              # Overview
+│   │   │   │       ├── websites/             # Website management
+│   │   │   │       │   ├── page.tsx          # List websites
+│   │   │   │       │   ├── new/page.tsx      # Add website
+│   │   │   │       │   └── [id]/
+│   │   │   │       │       ├── page.tsx      # Website detail
+│   │   │   │       │       ├── topics/       # Topic management
+│   │   │   │       │       ├── settings/     # Website settings
+│   │   │   │       │       └── api-keys/     # API key config
+│   │   │   │       ├── logs/                 # Generation logs
+│   │   │   │       └── settings/             # Global settings
+│   │   │   └── api/             # API routes
+│   │   ├── components/          # React components
+│   │   │   ├── ui/              # shadcn/ui components
+│   │   │   └── dashboard/       # Dashboard-specific components
+│   │   ├── lib/                 # Utilities
+│   │   │   ├── supabase/        # Supabase clients
+│   │   │   └── encryption.ts    # AES-256-GCM encryption
+│   │   └── types/               # TypeScript types
+│   ├── wrangler.toml            # Cloudflare Workers config
+│   └── package.json
+│
+├── worker/                       # Python Content Generator
+│   ├── src/
+│   │   └── entry.py             # Main worker logic
+│   ├── wrangler.toml            # Cloudflare Workers config
+│   ├── requirements.txt         # Python dependencies
+│   └── pyproject.toml           # Python project config
+│
+├── central_database_schema.sql   # Central Supabase schema
+├── database_schema.sql           # Target website schema
+├── migrations/                   # Database migrations
+│   └── 001_add_topic_settings.sql
+│
+└── config/                       # Legacy config files
+    ├── settings.py
+    ├── prompts.py
+    └── product_content.py
 ```
 
 ---
 
-## 🔧 Configuration Checklist
+## Setup Guide
 
-When setting up for a new project:
+### Prerequisites
 
-### Step 1: Product Configuration (Single File!)
-- [ ] Copy `config/product_content_template.py` → `config/product_content.py`
-- [ ] Fill in all 8 sections in `product_content.py`:
-  - [ ] PRODUCT_INFO (company name, domain, author)
-  - [ ] SYSTEM_PROMPTS (OpenAI and Claude prompts)
-  - [ ] SEO_CONTENT (audience, meta templates, schema)
-  - [ ] INTERNAL_LINKS (CTAs and related blog links)
-  - [ ] CATEGORIES (keyword-to-category mappings)
-  - [ ] TITLE_PATTERNS (auto title generation)
-  - [ ] SEASONAL_CATEGORIES (optional)
-  - [ ] GOOGLE_NEWS (if using news discovery)
+- Node.js 18+
+- Python 3.11+
+- Cloudflare account
+- Supabase account (for central DB)
+- OpenAI API key
+- Anthropic API key
 
-### Step 2: Topics & Database
-- [ ] Create `data/topics_[product_id].json` (copy from template)
-- [ ] Run `database_schema.sql` in Supabase
+### 1. Central Database Setup
 
-### Step 3: Environment & Deployment
-- [ ] Set environment variables (API keys, Supabase credentials)
-- [ ] Test locally: `python main.py`
-- [ ] Deploy to Railway: `railway up`
-- [ ] Verify first article has GEO elements (TL;DR, FAQ, statistics)
+Create a new Supabase project for the central database, then run:
 
----
+```sql
+-- Run in Supabase SQL Editor
+-- Copy contents of central_database_schema.sql
+```
 
-## 🚂 Railway Deployment
+This creates:
+- `profiles` - User profiles (linked to Supabase Auth)
+- `websites` - Website configurations
+- `api_keys` - Encrypted API credentials
+- `topics` - Content topics per website
+- `generation_logs` - Article generation history
+- `worker_status` - Worker health tracking
+- `system_keys` - Shared system keys
 
-### Required Environment Variables
+### 2. Dashboard Deployment
 
 ```bash
-# API Keys (REQUIRED)
-OPENAI_API_KEY=sk-proj-xxx
-ANTHROPIC_API_KEY=sk-ant-xxx
+cd dashboard
 
-# Database (REQUIRED)
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_KEY=eyJxxx
+# Install dependencies
+npm install
 
-# Product Config (REQUIRED)
-PRODUCT_ID=myproduct
-WEBSITE_DOMAIN=example.com
+# Set environment variables
+cp .env.example .env
+# Edit .env with your Supabase credentials
 
-# Worker Config (OPTIONAL)
-RAILWAY_RUN_MODE=continuous
-DAYS_BETWEEN_POSTS=1
-ENVIRONMENT=production
-LOG_LEVEL=INFO
+# Build and deploy
+npm run build
+npx wrangler deploy
 ```
 
-### Deployment Steps
+**Required Environment Variables (Cloudflare Secrets):**
+```bash
+npx wrangler secret put NEXT_PUBLIC_SUPABASE_URL
+npx wrangler secret put NEXT_PUBLIC_SUPABASE_ANON_KEY
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler secret put ENCRYPTION_KEY  # Generate: openssl rand -base64 32
+```
+
+### 3. Worker Deployment
 
 ```bash
-# From seo_system directory
-railway login
-railway init
-railway up
+cd worker
+
+# Deploy to Cloudflare
+npx wrangler deploy
 ```
 
-The system will:
-1. Start health server on port 8000
-2. Check daily if article should be published
-3. Publish one article when due
-4. Sleep 24 hours until next check
+**Required Environment Variables (Cloudflare Secrets):**
+```bash
+npx wrangler secret put CENTRAL_SUPABASE_URL
+npx wrangler secret put CENTRAL_SUPABASE_SERVICE_KEY
+npx wrangler secret put ENCRYPTION_KEY  # Same as dashboard
+```
+
+### 4. Add Your First Website
+
+1. Go to https://seo-dashboard.ta-voeten.workers.dev
+2. Sign up / Log in
+3. Click "Add Website"
+4. Configure:
+   - Website name and domain
+   - Product ID (unique identifier)
+   - Target Supabase URL and service key
+   - OpenAI and/or Anthropic API keys
+5. Add topics manually or use "Discover Topics"
 
 ---
 
-## 💰 Cost Estimates (30 articles/month)
+## API Endpoints
 
-- **Railway Hosting**: $5/month
-- **OpenAI API (15 articles)**: ~$22/month
-- **Claude API (15 articles)**: ~$15/month
-- **Supabase**: $0/month (free tier)
-- **Total**: ~$42/month
+### Dashboard API
 
-Reduce costs by using cheaper models or publishing less frequently.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/api-keys` | GET/POST | Manage encrypted API keys |
+| `/auth/callback` | GET | Supabase auth callback |
+
+### Worker API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/generate` | POST | Trigger article generation |
+| `/discover?website_id=` | POST | Discover topics for website |
+
+### Worker Cron
+
+The worker runs on a cron schedule (`0 * * * *` - every hour) to:
+1. Find websites due for article generation
+2. Generate and publish articles
+3. Log results to central database
 
 ---
 
-## 🤖 GEO (Generative Engine Optimization)
+## Database Schema
 
-### What is GEO?
+### Central Database (Config & Logs)
 
-GEO optimizes content for **AI-powered search engines** like ChatGPT, Google AI Overviews, and Perplexity. While traditional SEO focuses on ranking in Google's search results, GEO ensures your content gets **cited by AI systems** when they synthesize answers.
+#### `websites`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Primary key |
+| `user_id` | UUID | Owner reference |
+| `name` | TEXT | Display name |
+| `domain` | TEXT | Website domain |
+| `product_id` | TEXT | Unique identifier |
+| `is_active` | BOOLEAN | Enable/disable |
+| `days_between_posts` | INTEGER | Publishing frequency |
+| `max_topic_uses` | INTEGER | Times a topic can be reused |
+| `auto_generate_topics` | BOOLEAN | Auto-generate when empty |
+| `system_prompt_openai` | TEXT | Custom OpenAI prompt |
+| `system_prompt_claude` | TEXT | Custom Claude prompt |
+| `seo_config` | JSONB | SEO settings |
+| `google_news_config` | JSONB | Topic discovery config |
 
-Research from Princeton and Georgia Tech shows specific content structures can increase AI citation rates by **35-40%**.
+#### `topics`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Primary key |
+| `website_id` | UUID | Website reference |
+| `title` | TEXT | Topic title |
+| `keywords` | TEXT[] | Related keywords |
+| `priority` | INTEGER | 1-10 priority |
+| `source` | TEXT | manual/ai_suggested/ai_generated |
+| `is_used` | BOOLEAN | Fully used flag |
+| `times_used` | INTEGER | Usage count |
 
-### How It Works
+#### `api_keys`
+| Column | Type | Description |
+|--------|------|-------------|
+| `website_id` | UUID | Website reference |
+| `openai_api_key_encrypted` | TEXT | Encrypted OpenAI key |
+| `anthropic_api_key_encrypted` | TEXT | Encrypted Anthropic key |
+| `target_supabase_url` | TEXT | Target DB URL |
+| `target_supabase_service_key_encrypted` | TEXT | Encrypted target DB key |
 
-The system automatically:
+### Target Database (Articles)
 
-1. **Generates GEO-optimized content** via enhanced prompts requiring:
-   - TL;DR summaries (50-75 words)
-   - FAQ sections (3-5 Q&A pairs)
-   - Statistics with source attribution
-   - Expert quotes with attribution
+Each website has its own Supabase with the `blog_articles` table:
 
-2. **Extracts GEO elements** from generated content:
-   - `tldr` - Summary AI systems can cite directly
-   - `faq_items` - Q&A pairs for structured answers
-   - `cited_statistics` - Facts with credibility signals
-   - `citations` - Expert authority signals
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Primary key |
+| `title` | TEXT | Article title |
+| `slug` | TEXT | URL slug |
+| `content` | TEXT | HTML content |
+| `excerpt` | TEXT | Short summary |
+| `meta_description` | TEXT | SEO meta |
+| `tldr` | TEXT | GEO summary |
+| `faq_items` | JSONB | FAQ Q&A pairs |
+| `faq_schema` | JSONB | FAQPage JSON-LD |
+| `cited_statistics` | JSONB | Stats with sources |
+| `geo_optimized` | BOOLEAN | GEO flag |
+| `seo_score` | INTEGER | Quality score |
 
-3. **Generates schema markup**:
-   - FAQPage JSON-LD schema for rich results
-   - Enhanced Article schema with speakable properties
+---
 
-4. **Scores GEO optimization** (35 points of SEO score):
-   - TL;DR present: +8 points
-   - FAQ section (3+ items): +10 points
-   - Statistics with sources (3+): +10 points
-   - Citations/quotes (2+): +7 points
+## Configuration Options
 
-### GEO Configuration
+### Website Settings
 
-In `config/settings.py`:
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `days_between_posts` | 3 | Days between article generation |
+| `max_topic_uses` | 1 | How many times to use a topic |
+| `auto_generate_topics` | false | Generate topics when queue empty |
+| `language` | en-US | Content language |
+| `default_author` | Team | Article author name |
 
-```python
-GEO_CONFIG = {
-    "enable_tldr": True,           # Generate TL;DR summaries
-    "enable_faq_schema": True,     # Generate FAQPage schema
-    "enable_citations": True,       # Extract statistics & quotes
-    "tldr_max_words": 75,          # Max TL;DR length
-    "faq_count": {"min": 3, "max": 5},  # FAQ items per article
-    "min_statistics": 3,           # Required cited stats
-    "min_citations": 2,            # Required expert quotes
-    "target_platforms": ["chatgpt", "google_ai", "perplexity"],
+### SEO Config (JSONB)
+
+```json
+{
+  "fallback_meta_template": "Learn about {topic} - comprehensive guide",
+  "default_category": "general",
+  "schema_organization": {
+    "name": "Company Name",
+    "url": "https://example.com",
+    "logo": "https://example.com/logo.png"
+  }
 }
 ```
 
-### Database Fields
+### Google News Config (JSONB)
 
-The system stores GEO data in these fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `tldr` | TEXT | AI-extractable summary |
-| `faq_items` | JSONB | `[{question, answer}]` |
-| `faq_schema` | JSONB | FAQPage JSON-LD |
-| `cited_statistics` | JSONB | `[{statistic, source}]` |
-| `citations` | JSONB | `[{quote, source}]` |
-| `geo_optimized` | BOOLEAN | GEO flag |
-
-### Verifying GEO Works
-
-```sql
--- Check GEO optimization status
-SELECT title, geo_optimized,
-       tldr IS NOT NULL as has_tldr,
-       jsonb_array_length(faq_items) as faq_count,
-       seo_score
-FROM blog_articles
-WHERE product_id = 'yourproduct'
-ORDER BY published_at DESC;
+```json
+{
+  "search_queries": ["industry news", "product updates"],
+  "relevance_keywords": ["keyword1", "keyword2"],
+  "exclude_keywords": ["competitor", "spam"],
+  "min_relevance_score": 0.6
+}
 ```
 
 ---
 
-## 🖥️ Frontend Integration
+## Deployment Status
 
-### Fetching Articles
+### Production Deployments
 
-```sql
--- Get published articles for your product
-SELECT * FROM blog_articles
-WHERE product_id = 'yourproduct'
-  AND status = 'published'
-ORDER BY published_at DESC;
+| Component | URL | Status |
+|-----------|-----|--------|
+| Dashboard | https://seo-dashboard.ta-voeten.workers.dev | Active |
+| Worker | https://seo-content-generator.ta-voeten.workers.dev | Active |
+| Central DB | Supabase (fvtkaqqpbkvgftjcartz) | Active |
+
+### Worker Cron Schedule
+
+- **Trigger**: `0 * * * *` (every hour)
+- **Action**: Check for websites due for generation
+- **AI Models**: GPT-4o (gpt-4o), Claude Sonnet 4 (claude-sonnet-4-20250514)
+
+### Recent Fixes
+
+- **Error 1101**: Fixed JS/Python interop using `to_js()` with `dict_converter`
+- **on_fetch missing**: Renamed method from `fetch` to `on_fetch` for Cloudflare Python Workers
+- **scheduled() signature**: Updated to accept `(self, event, env, ctx)`
+
+---
+
+## Cost Estimates
+
+| Service | Monthly Cost |
+|---------|--------------|
+| Cloudflare Workers (Dashboard) | $0 (free tier) |
+| Cloudflare Workers (Content) | $0 (free tier) |
+| Central Supabase | $0-25 (free → pro) |
+| OpenAI API (GPT-4o) | ~$20-50 |
+| Anthropic API (Claude) | ~$15-30 |
+| **Total** | **~$35-105/month** |
+
+---
+
+## Troubleshooting
+
+### Dashboard Issues
+
+**"Unable to login"**
+- Verify Supabase Auth is configured
+- Check NEXT_PUBLIC_SUPABASE_URL and ANON_KEY
+
+**"API keys not saving"**
+- Ensure ENCRYPTION_KEY is set
+- Check SUPABASE_SERVICE_ROLE_KEY permissions
+
+### Worker Issues
+
+**"Health endpoint returns 500"**
+- Check worker logs: `npx wrangler tail seo-content-generator`
+- Verify CENTRAL_SUPABASE_URL and SERVICE_KEY
+
+**"Cron not triggering"**
+- Verify cron schedule in wrangler.toml
+- Check worker status table in database
+
+**"Article not publishing"**
+- Verify target Supabase credentials
+- Check API key validation status
+- Review generation_logs for errors
+
+### Topic Discovery Issues
+
+**"Discovery failed"**
+- Verify OpenAI API key is valid
+- Check google_news_config has search_queries
+- Review worker logs for specific error
+
+---
+
+## Development
+
+### Local Dashboard Development
+
+```bash
+cd dashboard
+npm install
+npm run dev
+# Open http://localhost:3000
 ```
 
-### Database Fields Reference
+### Local Worker Testing
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `title`, `content`, `excerpt` | TEXT | Core article content (HTML) |
-| `slug` | TEXT | URL path (unique per product) |
-| `meta_description` | TEXT | SEO meta tag (120-160 chars) |
-| `cover_image_url`, `cover_image_alt` | TEXT | Featured image + alt text |
-| `author`, `read_time`, `category` | TEXT/INT | Article metadata |
-| `published_at` | TIMESTAMP | Publication date (ISO 8601) |
-| `primary_keyword`, `secondary_keywords` | TEXT/TEXT[] | SEO keywords |
-| `tags` | TEXT[] | Topic tags array |
+```bash
+cd worker
+npx wrangler dev
+# Worker runs at http://localhost:8787
+```
 
-### GEO Fields (AI Search Optimization)
+### Useful Commands
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `tldr` | TEXT | AI-extractable summary (50-75 words) |
-| `faq_items` | JSONB | `[{question, answer}]` - FAQ section |
-| `faq_schema` | JSONB | FAQPage JSON-LD schema |
-| `cited_statistics` | JSONB | `[{statistic, source}]` - Facts with sources |
-| `citations` | JSONB | `[{quote, source}]` - Expert quotes |
-| `schema_markup` | JSONB | Article/HowTo schema |
-| `geo_optimized` | BOOLEAN | GEO optimization flag |
+```bash
+# View worker logs
+npx wrangler tail seo-content-generator
 
-### Frontend Rendering Tips
+# Deploy dashboard
+cd dashboard && npm run build && npx wrangler deploy
 
-1. **TL;DR** - Display prominently at article start for AI extraction
-2. **FAQ Section** - Render `faq_items` as collapsible accordion
-3. **Schema Markup** - Inject `faq_schema` and `schema_markup` in `<head>`:
-   ```html
-   <script type="application/ld+json">
-     {{ article.faq_schema | json }}
-   </script>
-   ```
-4. **Statistics** - Highlight `cited_statistics` with source attribution
-5. **Content** - The `content` field is HTML - sanitize before rendering
+# Deploy worker
+cd worker && npx wrangler deploy
+
+# Test health endpoint
+curl https://seo-content-generator.ta-voeten.workers.dev/health
+
+# Trigger manual generation
+curl -X POST https://seo-content-generator.ta-voeten.workers.dev/generate
+```
 
 ---
 
-## 📚 Documentation Files
+## Security Considerations
 
-- `config/product_content_template.py` - **⭐ Main config template with examples**
-- `database_schema.sql` - Database setup SQL (with GEO fields)
-- `env.example` - Environment variables template
-- `data/topics_template.json` - Topic file template
-
----
-
-## 🐛 Troubleshooting
-
-### "No available topics found"
-**Fix**: Create `data/topics_[product_id].json` with your topics
-
-### Railway healthcheck failing
-**Fix**: Set `RAILWAY_RUN_MODE=continuous` environment variable
-
-### Articles not in database
-**Fix**: Verify `PRODUCT_ID` and `SUPABASE_SERVICE_KEY` variables
+- **API Keys**: Encrypted with AES-256-GCM before storage
+- **Row Level Security**: Users only see their own websites/topics
+- **Service Keys**: Only used server-side, never exposed to client
+- **Supabase Auth**: Handles user authentication and sessions
+- **CORS**: Configured for dashboard domain only
 
 ---
 
-## 🎯 Perfect For
+## Future Improvements
 
-- Blog automation for any niche
-- SEO-focused content marketing
-- **AI search visibility** (ChatGPT, Google AI, Perplexity)
-- Multi-product content systems
-- B2B/B2C educational content
-- Consistent publishing schedules
-
----
-
-## 📖 Further Reading
-
-- [GEO Research Paper](https://arxiv.org/abs/2311.09735) - Original Princeton/Georgia Tech research
-- [Schema.org FAQPage](https://schema.org/FAQPage) - FAQ schema documentation
-- [Google Rich Results Test](https://search.google.com/test/rich-results) - Validate your schema markup
+- [ ] Real-time generation progress via WebSocket
+- [ ] Bulk topic import (CSV/JSON)
+- [ ] A/B testing for article titles
+- [ ] Analytics dashboard
+- [ ] Multi-language support per website
+- [ ] WordPress integration
+- [ ] Custom AI model selection per website
 
 ---
 
-**Built with ❤️ for automated content marketing**
+## License
 
-**Version**: 2.2.0 (Language-Agnostic Template)
-**Last Updated**: 2025-12-29
+MIT License - See LICENSE file for details.
+
+---
+
+**Version**: 3.0.0 (Centralized Multi-Website System)
+**Last Updated**: 2026-01-14

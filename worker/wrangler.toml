@@ -1,0 +1,26 @@
+name = "seo-content-generator"
+main = "src/entry.py"
+compatibility_date = "2024-12-30"
+compatibility_flags = ["python_workers"]
+
+# Cron Triggers - runs every hour to check for scheduled generations
+[triggers]
+crons = ["0 * * * *"]  # Every hour at minute 0
+
+# Environment variables (set these in Cloudflare dashboard or via wrangler secret)
+# CENTRAL_SUPABASE_URL = "https://xxx.supabase.co"
+# CENTRAL_SUPABASE_SERVICE_KEY = "your-service-key"
+# ENCRYPTION_KEY = "your-32-byte-base64-key"
+
+[vars]
+ENVIRONMENT = "production"
+
+# Bindings for secrets (set via: wrangler secret put SECRET_NAME)
+# - CENTRAL_SUPABASE_URL
+# - CENTRAL_SUPABASE_SERVICE_KEY
+# - ENCRYPTION_KEY
+
+# Optional: KV namespace for caching
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "your-kv-namespace-id"

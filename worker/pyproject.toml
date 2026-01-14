@@ -1,0 +1,14 @@
+[project]
+name = "seo-content-generator"
+version = "1.0.0"
+description = "Cloudflare Worker for SEO content generation"
+requires-python = ">=3.12"
+
+# Note: We use minimal dependencies because we make HTTP requests directly
+# instead of using SDKs (openai, anthropic, supabase SDKs don't work in Pyodide)
+dependencies = []
+
+[tool.uv]
+dev-dependencies = [
+    "wrangler",
+]
