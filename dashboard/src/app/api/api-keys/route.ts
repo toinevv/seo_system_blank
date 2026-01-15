@@ -21,9 +21,9 @@ export async function POST(request: Request) {
       target_supabase_service_key,
     } = body;
 
-    if (!website_id || !target_supabase_url || !target_supabase_service_key) {
+    if (!website_id) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "website_id is required" },
         { status: 400 }
       );
     }
@@ -43,17 +43,59 @@ export async function POST(request: Request) {
       );
     }
 
-    // Encrypt sensitive data
-    const encryptedData = {
+    // Use admin client to bypass RLS
+    const adminClient = createAdminClient();
+
+    // Get existing keys to preserve values not being updated
+    const { data: existingKeys } = await adminClient
+      .from("api_keys")
+      .select("*")
+      .eq("website_id", website_id)
+      .single();
+
+    // Build update object - only update fields that are provided
+    const encryptedData: Record<string, unknown> = {
       website_id,
-      openai_api_key_encrypted: openai_api_key ? encrypt(openai_api_key) : null,
-      anthropic_api_key_encrypted: anthropic_api_key ? encrypt(anthropic_api_key) : null,
-      target_supabase_url,
-      target_supabase_service_key_encrypted: encrypt(target_supabase_service_key),
+      updated_at: new Date().toISOString(),
     };
 
-    // Use admin client to bypass RLS for upsert
-    const adminClient = createAdminClient();
+    // Only update OpenAI key if provided (non-empty string)
+    if (openai_api_key && openai_api_key.trim()) {
+      encryptedData.openai_api_key_encrypted = encrypt(openai_api_key);
+    } else if (!existingKeys) {
+      // First time setup - allow null
+      encryptedData.openai_api_key_encrypted = null;
+    }
+    // If not provided and exists, keep existing value (don't include in update)
+
+    // Only update Anthropic key if provided
+    if (anthropic_api_key && anthropic_api_key.trim()) {
+      encryptedData.anthropic_api_key_encrypted = encrypt(anthropic_api_key);
+    } else if (!existingKeys) {
+      encryptedData.anthropic_api_key_encrypted = null;
+    }
+
+    // Only update target URL if provided
+    if (target_supabase_url && target_supabase_url.trim()) {
+      encryptedData.target_supabase_url = target_supabase_url.trim();
+    } else if (!existingKeys) {
+      return NextResponse.json(
+        { error: "Target Supabase URL is required for initial setup" },
+        { status: 400 }
+      );
+    }
+
+    // Only update target service key if provided
+    if (target_supabase_service_key && target_supabase_service_key.trim()) {
+      encryptedData.target_supabase_service_key_encrypted = encrypt(target_supabase_service_key);
+    } else if (!existingKeys) {
+      return NextResponse.json(
+        { error: "Target Supabase Service Key is required for initial setup" },
+        { status: 400 }
+      );
+    }
+
+    // Upsert - insert or update
     const { error } = await adminClient
       .from("api_keys")
       .upsert(encryptedData, { onConflict: "website_id" });
