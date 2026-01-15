@@ -5,7 +5,7 @@ Uses HTTP fetch instead of SDKs (required for Pyodide/WebAssembly).
 """
 
 from workers import Response, WorkerEntrypoint
-from js import fetch, Object, console
+from js import fetch, Object, console, crypto, Uint8Array, TextDecoder
 from pyodide.ffi import to_js
 import json
 import base64
@@ -24,6 +24,58 @@ class Default(WorkerEntrypoint):
         if body:
             options["body"] = body
         return to_js(options, dict_converter=Object.fromEntries)
+
+    async def _parse_json(self, response) -> any:
+        """Parse JSON response and convert JsProxy to Python native types."""
+        data = await response.json()
+        if hasattr(data, 'to_py'):
+            return data.to_py()
+        return data
+
+    async def _decrypt(self, encrypted_base64: str, key_base64: str) -> str:
+        """Decrypt AES-256-GCM encrypted data using WebCrypto API."""
+        if not encrypted_base64 or not key_base64:
+            return None
+        try:
+            # Decode base64 to bytes
+            encrypted_bytes = base64.b64decode(encrypted_base64)
+            key_bytes = base64.b64decode(key_base64)
+
+            # Extract IV (16 bytes), tag (16 bytes), ciphertext
+            iv = encrypted_bytes[:16]
+            tag = encrypted_bytes[16:32]
+            ciphertext = encrypted_bytes[32:]
+
+            # WebCrypto expects ciphertext + tag concatenated
+            ciphertext_with_tag = ciphertext + tag
+
+            # Convert to JS Uint8Array
+            iv_js = Uint8Array.new(list(iv))
+            key_js = Uint8Array.new(list(key_bytes))
+            data_js = Uint8Array.new(list(ciphertext_with_tag))
+
+            # Import the key
+            crypto_key = await crypto.subtle.importKey(
+                "raw",
+                key_js,
+                to_js({"name": "AES-GCM"}, dict_converter=Object.fromEntries),
+                False,
+                to_js(["decrypt"])
+            )
+
+            # Decrypt
+            decrypted = await crypto.subtle.decrypt(
+                to_js({"name": "AES-GCM", "iv": iv_js}, dict_converter=Object.fromEntries),
+                crypto_key,
+                data_js
+            )
+
+            # Convert result to string
+            decoder = TextDecoder.new()
+            return decoder.decode(decrypted)
+        except Exception as e:
+            console.log(f"Decryption error: {str(e)}")
+            return None
 
     async def on_fetch(self, request):
         """Handle HTTP requests (for manual triggers and health checks)."""
@@ -65,11 +117,12 @@ class Default(WorkerEntrypoint):
     async def run_generation(self) -> dict:
         """Main generation logic - check websites and generate content."""
         try:
-            supabase_url = self.env.CENTRAL_SUPABASE_URL
-            supabase_key = self.env.CENTRAL_SUPABASE_SERVICE_KEY
-            encryption_key = self.env.ENCRYPTION_KEY
+            supabase_url = getattr(self.env, "CENTRAL_SUPABASE_URL", None)
+            supabase_key = getattr(self.env, "CENTRAL_SUPABASE_SERVICE_KEY", None)
+            encryption_key = getattr(self.env, "ENCRYPTION_KEY", None)
 
             if not all([supabase_url, supabase_key, encryption_key]):
+                console.log("Missing required environment variables")
                 return {"error": "Missing environment variables"}
 
             websites = await self.get_websites_due(supabase_url, supabase_key)
@@ -99,7 +152,6 @@ class Default(WorkerEntrypoint):
         """Fetch websites that are due for content generation."""
         now = datetime.now().isoformat()
         url = f"{supabase_url}/rest/v1/websites?is_active=eq.true&next_scheduled_at=lte.{now}&select=*"
-
         headers = {
             "apikey": supabase_key,
             "Authorization": f"Bearer {supabase_key}",
@@ -109,8 +161,8 @@ class Default(WorkerEntrypoint):
         response = await fetch(url, self._make_options("GET", headers))
 
         if response.ok:
-            data = await response.json()
-            return list(data) if data else []
+            data = await self._parse_json(response)
+            return data if data else []
         return []
 
     async def process_website(
@@ -130,18 +182,29 @@ class Default(WorkerEntrypoint):
             console.log(f"No API keys for website {website.get('name')}")
             return False
 
-        # Get decrypted keys (or raw keys for now)
-        openai_key = api_keys.get("openai_api_key_encrypted")
-        anthropic_key = api_keys.get("anthropic_api_key_encrypted")
+        # Decrypt API keys
+        openai_key_encrypted = api_keys.get("openai_api_key_encrypted")
+        anthropic_key_encrypted = api_keys.get("anthropic_api_key_encrypted")
         target_url = api_keys.get("target_supabase_url")
-        target_key = api_keys.get("target_supabase_service_key_encrypted")
+        target_key_encrypted = api_keys.get("target_supabase_service_key_encrypted")
 
-        if not target_url or not target_key:
+        if not target_url or not target_key_encrypted:
             console.log("Missing target database credentials")
             return False
 
+        # Decrypt the keys
+        openai_key = await self._decrypt(openai_key_encrypted, encryption_key) if openai_key_encrypted else None
+        anthropic_key = await self._decrypt(anthropic_key_encrypted, encryption_key) if anthropic_key_encrypted else None
+        target_key = await self._decrypt(target_key_encrypted, encryption_key) if target_key_encrypted else None
+
+        console.log(f"Decryption results - OpenAI: {openai_key is not None}, Anthropic: {anthropic_key is not None}, Target: {target_key is not None}")
+
         if not openai_key and not anthropic_key:
-            console.log("No AI API keys configured")
+            console.log("No AI API keys configured or decryption failed")
+            return False
+
+        if not target_key:
+            console.log("Target Supabase key decryption failed")
             return False
 
         # Get next topic (with reuse support)
@@ -205,8 +268,8 @@ class Default(WorkerEntrypoint):
         response = await fetch(url, self._make_options("GET", headers))
 
         if response.ok:
-            data = await response.json()
-            return dict(data[0]) if data and len(list(data)) > 0 else None
+            data = await self._parse_json(response)
+            return dict(data[0]) if data and len(data) > 0 else None
         return None
 
     async def get_next_topic(
@@ -236,8 +299,8 @@ class Default(WorkerEntrypoint):
         response = await fetch(url, self._make_options("GET", headers))
 
         if response.ok:
-            data = await response.json()
-            if data and len(list(data)) > 0:
+            data = await self._parse_json(response)
+            if data and len(data) > 0:
                 return dict(data[0])
 
         # If max_uses > 1, try to get reusable topic
@@ -246,8 +309,8 @@ class Default(WorkerEntrypoint):
             response = await fetch(url, self._make_options("GET", headers))
 
             if response.ok:
-                data = await response.json()
-                if data and len(list(data)) > 0:
+                data = await self._parse_json(response)
+                if data and len(data) > 0:
                     return dict(data[0])
 
         # If auto_generate is enabled and we have an API key, generate a topic
@@ -297,7 +360,7 @@ Return ONLY a JSON object (no markdown, no code blocks):
             )
 
             if response.ok:
-                data = await response.json()
+                data = await self._parse_json(response)
                 content = data["choices"][0]["message"]["content"]
                 # Clean up potential markdown formatting
                 content = content.strip()
@@ -346,17 +409,18 @@ Return ONLY a JSON object (no markdown, no code blocks):
         )
 
         if response.ok:
-            result = await response.json()
+            result = await self._parse_json(response)
             return dict(result[0]) if result else None
         return None
 
     async def discover_all_topics(self) -> dict:
         """Discover topics for all active websites."""
         try:
-            supabase_url = self.env.CENTRAL_SUPABASE_URL
-            supabase_key = self.env.CENTRAL_SUPABASE_SERVICE_KEY
+            supabase_url = getattr(self.env, "CENTRAL_SUPABASE_URL", None)
+            supabase_key = getattr(self.env, "CENTRAL_SUPABASE_SERVICE_KEY", None)
+            encryption_key = getattr(self.env, "ENCRYPTION_KEY", None)
 
-            if not all([supabase_url, supabase_key]):
+            if not all([supabase_url, supabase_key, encryption_key]):
                 return {"error": "Missing environment variables"}
 
             # Get all active websites
@@ -371,19 +435,29 @@ Return ONLY a JSON object (no markdown, no code blocks):
             if not response.ok:
                 return {"error": "Failed to fetch websites"}
 
-            websites = list(await response.json())
+            websites = list(await self._parse_json(response))
+            console.log(f"Discovering topics for {len(websites)} websites")
             discovered = 0
 
             for website in websites:
                 api_keys = await self.get_api_keys(website.get("id"), supabase_url, supabase_key)
                 if api_keys and api_keys.get("openai_api_key_encrypted"):
+                    # Decrypt the API key before using
+                    openai_key = await self._decrypt(api_keys.get("openai_api_key_encrypted"), encryption_key)
+                    if not openai_key:
+                        console.log(f"Failed to decrypt OpenAI key for {website.get('name')}")
+                        continue
                     topics = await self.discover_topics_for_website(
                         website,
-                        api_keys.get("openai_api_key_encrypted"),
+                        openai_key,
                         supabase_url,
                         supabase_key
                     )
+                    if topics:
+                        console.log(f"Discovered {len(topics)} topics for {website.get('name')}")
                     discovered += len(topics) if topics else 0
+                else:
+                    console.log(f"Skipping {website.get('name')} - no OpenAI API key")
 
             return {"message": f"Discovered {discovered} topics", "discovered": discovered}
 
@@ -433,7 +507,7 @@ Return ONLY a JSON object (no markdown):
             )
 
             if response.ok:
-                data = await response.json()
+                data = await self._parse_json(response)
                 content = data["choices"][0]["message"]["content"]
                 content = content.strip()
                 if content.startswith("```"):
@@ -454,7 +528,10 @@ Return ONLY a JSON object (no markdown):
                         saved.append(saved_topic)
 
                 return saved
-            return []
+            else:
+                error_text = await response.text()
+                console.log(f"OpenAI error: {error_text}")
+                return []
         except Exception as e:
             console.log(f"Topic discovery failed: {str(e)}")
             return []
@@ -498,7 +575,7 @@ Return ONLY a JSON object (no markdown):
             )
 
             if response.ok:
-                data = await response.json()
+                data = await self._parse_json(response)
                 return data["choices"][0]["message"]["content"]
             else:
                 error = await response.text()
@@ -532,7 +609,7 @@ Return ONLY a JSON object (no markdown):
             )
 
             if response.ok:
-                data = await response.json()
+                data = await self._parse_json(response)
                 return data["content"][0]["text"]
             else:
                 error = await response.text()
@@ -703,7 +780,7 @@ Always include practical examples and real-world applications where relevant."""
         )
 
         if response.ok:
-            result = await response.json()
+            result = await self._parse_json(response)
             return result[0].get("id") if result else None
         return None
 
@@ -753,8 +830,8 @@ Always include practical examples and real-world applications where relevant."""
 
         times_used = 0
         if response.ok:
-            data = await response.json()
-            if data and len(list(data)) > 0:
+            data = await self._parse_json(response)
+            if data and len(data) > 0:
                 times_used = dict(data[0]).get("times_used", 0)
 
         new_times_used = times_used + 1
