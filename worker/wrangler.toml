@@ -15,6 +15,14 @@ crons = ["0 * * * *"]  # Every hour at minute 0
 [vars]
 ENVIRONMENT = "production"
 
+# Enable observability for debugging
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 # Bindings for secrets (set via: wrangler secret put SECRET_NAME)
 # - CENTRAL_SUPABASE_URL
 # - CENTRAL_SUPABASE_SERVICE_KEY
