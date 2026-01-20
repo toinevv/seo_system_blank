@@ -9,8 +9,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { ArrowLeft, Save, Loader2, Trash2 } from "lucide-react";
-import type { Website } from "@/types/database";
+import { ArrowLeft, Save, Loader2, Trash2, Key, AlertTriangle } from "lucide-react";
+import type { Website, GenerationLog } from "@/types/database";
+
+// Smart error notification helper
+function getErrorNotification(errorMessage: string | null): { message: string; type: "warning" | "error" } | null {
+  if (!errorMessage) return null;
+
+  const lower = errorMessage.toLowerCase();
+
+  if (lower.includes("no api keys")) {
+    return { message: "Configure your OpenAI or Anthropic API key above", type: "warning" };
+  }
+  if (lower.includes("decryption failed") || lower.includes("decryption error")) {
+    return { message: "API keys may be corrupted. Try re-entering them.", type: "warning" };
+  }
+  if (lower.includes("pgrst204") || lower.includes("column")) {
+    return { message: "Target database schema mismatch. Some columns may be missing.", type: "warning" };
+  }
+  if (lower.includes("openai error") || lower.includes("anthropic error")) {
+    return { message: "AI API returned an error. Check your API key is valid.", type: "error" };
+  }
+  if (lower.includes("save article error") || lower.includes("failed to save")) {
+    return { message: "Could not save to target database. Check credentials.", type: "error" };
+  }
+  if (lower.includes("no topics")) {
+    return { message: "No topics available. Add topics or enable auto-generation.", type: "warning" };
+  }
+
+  return { message: errorMessage, type: "error" };
+}
 
 export default function SettingsPage() {
   const params = useParams();
@@ -20,11 +48,17 @@ export default function SettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingKeys, setSavingKeys] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [keysSuccess, setKeysSuccess] = useState(false);
+  const [keysError, setKeysError] = useState<string | null>(null);
 
   const [website, setWebsite] = useState<Website | null>(null);
+  const [recentErrors, setRecentErrors] = useState<GenerationLog[]>([]);
+
+  // Website settings form
   const [formData, setFormData] = useState({
     name: "",
     domain: "",
@@ -36,8 +70,18 @@ export default function SettingsPage() {
     system_prompt_claude: "",
   });
 
+  // API keys form
+  const [apiKeysData, setApiKeysData] = useState({
+    openai_api_key: "",
+    anthropic_api_key: "",
+    target_supabase_url: "",
+    target_supabase_service_key: "",
+  });
+
   useEffect(() => {
     fetchWebsite();
+    fetchApiKeys();
+    fetchRecentErrors();
   }, [websiteId]);
 
   const fetchWebsite = async () => {
@@ -61,6 +105,37 @@ export default function SettingsPage() {
       });
     }
     setLoading(false);
+  };
+
+  const fetchApiKeys = async () => {
+    try {
+      const response = await fetch(`/api/api-keys?website_id=${websiteId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setApiKeysData({
+          openai_api_key: data.openai_api_key || "",
+          anthropic_api_key: data.anthropic_api_key || "",
+          target_supabase_url: data.target_supabase_url || "",
+          target_supabase_service_key: data.target_supabase_service_key || "",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch API keys:", err);
+    }
+  };
+
+  const fetchRecentErrors = async () => {
+    const { data } = await supabase
+      .from("generation_logs")
+      .select("*")
+      .eq("website_id", websiteId)
+      .eq("status", "failed")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (data) {
+      setRecentErrors(data as GenerationLog[]);
+    }
   };
 
   const handleSave = async () => {
@@ -89,6 +164,35 @@ export default function SettingsPage() {
     }
 
     setSaving(false);
+  };
+
+  const handleSaveApiKeys = async () => {
+    setSavingKeys(true);
+    setKeysError(null);
+    setKeysSuccess(false);
+
+    try {
+      const response = await fetch("/api/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          website_id: websiteId,
+          ...apiKeysData,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to save API keys");
+      }
+
+      setKeysSuccess(true);
+      fetchApiKeys();
+    } catch (err) {
+      setKeysError(err instanceof Error ? err.message : "Failed to save");
+    }
+
+    setSavingKeys(false);
   };
 
   const handleDelete = async () => {
@@ -230,6 +334,104 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* API Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              API Configuration
+            </CardTitle>
+            <CardDescription>
+              Configure AI and database credentials for content generation.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {keysError && (
+              <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+                {keysError}
+              </div>
+            )}
+
+            {keysSuccess && (
+              <div className="rounded-md bg-green-100 p-3 text-sm text-green-800">
+                API keys saved successfully!
+              </div>
+            )}
+
+            {/* AI Keys */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="openai">OpenAI API Key</Label>
+                <Input
+                  id="openai"
+                  type="password"
+                  placeholder="sk-proj-..."
+                  value={apiKeysData.openai_api_key}
+                  onChange={(e) =>
+                    setApiKeysData({ ...apiKeysData, openai_api_key: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="anthropic">Anthropic API Key</Label>
+                <Input
+                  id="anthropic"
+                  type="password"
+                  placeholder="sk-ant-..."
+                  value={apiKeysData.anthropic_api_key}
+                  onChange={(e) =>
+                    setApiKeysData({ ...apiKeysData, anthropic_api_key: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Target Database */}
+            <div className="space-y-4 pt-4 border-t">
+              <div className="space-y-2">
+                <Label htmlFor="supabase_url">Target Supabase URL</Label>
+                <Input
+                  id="supabase_url"
+                  placeholder="https://xxxxx.supabase.co"
+                  value={apiKeysData.target_supabase_url}
+                  onChange={(e) =>
+                    setApiKeysData({ ...apiKeysData, target_supabase_url: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="supabase_key">Target Service Role Key</Label>
+                <Input
+                  id="supabase_key"
+                  type="password"
+                  placeholder="eyJhbGciOiJIUzI1NiIs..."
+                  value={apiKeysData.target_supabase_service_key}
+                  onChange={(e) =>
+                    setApiKeysData({
+                      ...apiKeysData,
+                      target_supabase_service_key: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+
+            <Button onClick={handleSaveApiKeys} disabled={savingKeys} className="w-full">
+              {savingKeys ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving API Keys...
+                </>
+              ) : (
+                <>
+                  <Key className="h-4 w-4 mr-2" />
+                  Save API Keys
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* System Prompts */}
         <Card>
           <CardHeader>
@@ -266,7 +468,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Save Button */}
+        {/* Save Button for Website Settings */}
         <Button onClick={handleSave} disabled={saving} className="w-full">
           {saving ? (
             <>
@@ -280,6 +482,52 @@ export default function SettingsPage() {
             </>
           )}
         </Button>
+
+        {/* Recent Errors */}
+        {recentErrors.length > 0 && (
+          <Card className="border-yellow-200">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2 text-yellow-700">
+                <AlertTriangle className="h-4 w-4" />
+                Recent Generation Errors
+              </CardTitle>
+              <CardDescription>
+                Last {recentErrors.length} failed generation attempts
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {recentErrors.map((log) => {
+                const notification = getErrorNotification(log.error_message);
+                return (
+                  <div
+                    key={log.id}
+                    className={`rounded-md p-3 text-sm ${
+                      notification?.type === "error"
+                        ? "bg-red-50 border border-red-200"
+                        : "bg-yellow-50 border border-yellow-200"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1">
+                        <p className={notification?.type === "error" ? "text-red-800" : "text-yellow-800"}>
+                          {notification?.message || log.error_message || "Unknown error"}
+                        </p>
+                        {log.article_title && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Article: {log.article_title}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(log.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Danger Zone */}
         <Card className="border-destructive">

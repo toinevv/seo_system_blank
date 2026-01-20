@@ -1,0 +1,11 @@
+# IndexYourNiche Robots.txt
+User-agent: *
+Allow: /
+
+# Disallow dashboard/admin areas
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Sitemap
+Sitemap: https://indexyourniche.com/sitemap.xml

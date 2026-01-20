@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   Globe,
   FileText,
-  Settings,
+  BookOpen,
   LogOut,
   ChevronRight,
 } from "lucide-react";
@@ -31,9 +31,9 @@ const navigation = [
     icon: FileText,
   },
   {
-    name: "Settings",
-    href: "/dashboard/settings",
-    icon: Settings,
+    name: "Setup Guide",
+    href: "/dashboard/setup",
+    icon: BookOpen,
   },
 ];
 

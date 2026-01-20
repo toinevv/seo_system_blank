@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
+import { PostHogProvider } from "./providers";
 
-const inter = Inter({ subsets: ["latin"] });
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-sans",
+});
 
 export const metadata: Metadata = {
-  title: "SEO Dashboard",
-  description: "Centralized SEO content management system",
+  title: "IndexYourNiche - SEO & GEO for Niche Builders",
+  description: "Get your niche project indexed and ranking. SEO + AI search visibility made simple for Lovable, Replit, Claude Code & Cursor projects.",
 };
 
 export default function RootLayout({
@@ -16,7 +21,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={`${ibmPlexSans.className} antialiased`}>
+        <PostHogProvider>{children}</PostHogProvider>
+      </body>
     </html>
   );
 }

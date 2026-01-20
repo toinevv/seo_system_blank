@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { encrypt, decrypt, maskApiKey } from "@/lib/encryption";
+import { encrypt, decrypt } from "@/lib/encryption";
 
 export async function POST(request: Request) {
   try {
@@ -95,17 +95,34 @@ export async function POST(request: Request) {
       );
     }
 
-    // Upsert - insert or update
-    const { error } = await adminClient
-      .from("api_keys")
-      .upsert(encryptedData, { onConflict: "website_id" });
+    // Use update for existing records, insert for new ones
+    if (existingKeys) {
+      // Update existing record - only update fields that are provided
+      const { error } = await adminClient
+        .from("api_keys")
+        .update(encryptedData)
+        .eq("website_id", website_id);
 
-    if (error) {
-      console.error("Error saving API keys:", error);
-      return NextResponse.json(
-        { error: "Failed to save API keys" },
-        { status: 500 }
-      );
+      if (error) {
+        console.error("Error updating API keys:", error);
+        return NextResponse.json(
+          { error: "Failed to update API keys" },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Insert new record
+      const { error } = await adminClient
+        .from("api_keys")
+        .insert(encryptedData);
+
+      if (error) {
+        console.error("Error inserting API keys:", error);
+        return NextResponse.json(
+          { error: "Failed to save API keys" },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({ success: true });
@@ -161,20 +178,28 @@ export async function GET(request: Request) {
       .single();
 
     if (!apiKeys) {
-      return NextResponse.json({ configured: false });
+      return NextResponse.json({
+        configured: false,
+        openai_api_key: "",
+        anthropic_api_key: "",
+        target_supabase_url: "",
+        target_supabase_service_key: "",
+      });
     }
 
-    // Return masked versions for display
+    // Return actual decrypted values for display
     return NextResponse.json({
       configured: true,
-      openai_configured: !!apiKeys.openai_api_key_encrypted,
-      anthropic_configured: !!apiKeys.anthropic_api_key_encrypted,
-      target_supabase_url: apiKeys.target_supabase_url,
-      target_db_configured: !!apiKeys.target_supabase_service_key_encrypted,
-      openai_validated: apiKeys.openai_validated,
-      anthropic_validated: apiKeys.anthropic_validated,
-      target_db_validated: apiKeys.target_db_validated,
-      last_validated_at: apiKeys.last_validated_at,
+      openai_api_key: apiKeys.openai_api_key_encrypted
+        ? decrypt(apiKeys.openai_api_key_encrypted)
+        : "",
+      anthropic_api_key: apiKeys.anthropic_api_key_encrypted
+        ? decrypt(apiKeys.anthropic_api_key_encrypted)
+        : "",
+      target_supabase_url: apiKeys.target_supabase_url || "",
+      target_supabase_service_key: apiKeys.target_supabase_service_key_encrypted
+        ? decrypt(apiKeys.target_supabase_service_key_encrypted)
+        : "",
     });
   } catch (error) {
     console.error("Get API keys error:", error);

@@ -31,6 +31,13 @@ export interface Website {
   categories: Categories;
   google_news_config: GoogleNewsConfig;
   total_articles_generated: number;
+  // Topic generation settings
+  max_topic_uses: number;
+  auto_generate_topics: boolean;
+  // Website scanning settings
+  auto_scan_enabled: boolean;
+  scan_frequency_days: number;
+  google_search_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -88,15 +95,47 @@ export interface Topic {
   keywords: string[];
   category: string | null;
   priority: number;
-  source: "manual" | "google_news" | "imported" | "ai_suggested" | "ai_generated";
+  source: "manual" | "google_news" | "imported" | "ai_suggested" | "ai_generated" | "google_search";
   is_used: boolean;
   used_at: string | null;
   times_used: number;
   last_seo_score: number | null;
   original_title: string | null;
   notes: string | null;
+  discovery_context: DiscoveryContext | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DiscoveryContext {
+  used_scan_data?: boolean;
+  niche?: string;
+  themes_used?: string[];
+  search_source?: string;
+  snippet?: string;
+}
+
+export interface WebsiteScan {
+  id: string;
+  website_id: string;
+  homepage_title: string | null;
+  homepage_meta_description: string | null;
+  main_keywords: string[];
+  headings: string[];
+  navigation_links: NavigationLink[];
+  content_themes: string[];
+  niche_description: string | null;
+  pages_scanned: number;
+  scan_status: "pending" | "scanning" | "completed" | "failed";
+  error_message: string | null;
+  last_scanned_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NavigationLink {
+  url: string;
+  text: string;
 }
 
 export interface GenerationLog {

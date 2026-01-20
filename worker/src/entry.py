@@ -535,17 +535,17 @@ Return ONLY a JSON object (no markdown, no code blocks):
         all_topics = []
 
         # 1. Try Google Custom Search API if enabled and configured
-        if website.get("google_search_enabled", True) and encryption_key:
-            google_api_key = await self.get_system_key("google_search_api_key", supabase_url, supabase_key, encryption_key)
-            google_cx_id = await self.get_system_key("google_search_cx_id", supabase_url, supabase_key, encryption_key)
+        # Keys are stored as Cloudflare secrets (faster, no DB lookup needed)
+        google_api_key = getattr(self.env, 'GOOGLE_SEARCH_API_KEY', None)
+        google_cx_id = getattr(self.env, 'GOOGLE_SEARCH_CX_ID', None)
 
-            if google_api_key and google_cx_id and scan_data:
-                console.log(f"Discovering topics from Google Search for {website.get('name')}")
-                google_topics = await self.discover_topics_from_search(
-                    website, scan_data, google_api_key, google_cx_id, supabase_url, supabase_key
-                )
-                all_topics.extend(google_topics)
-                console.log(f"Found {len(google_topics)} topics from Google Search")
+        if website.get("google_search_enabled", True) and google_api_key and google_cx_id and scan_data:
+            console.log(f"Discovering topics from Google Search for {website.get('name')}")
+            google_topics = await self.discover_topics_from_search(
+                website, scan_data, google_api_key, google_cx_id, supabase_url, supabase_key
+            )
+            all_topics.extend(google_topics)
+            console.log(f"Found {len(google_topics)} topics from Google Search")
 
         # 2. Generate AI topics with context
         if scan_data and scan_data.get("niche_description"):

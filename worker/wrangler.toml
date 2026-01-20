@@ -24,9 +24,14 @@ enabled = true
 invocation_logs = true
 
 # Bindings for secrets (set via: wrangler secret put SECRET_NAME)
-# - CENTRAL_SUPABASE_URL
-# - CENTRAL_SUPABASE_SERVICE_KEY
-# - ENCRYPTION_KEY
+# Required:
+# - CENTRAL_SUPABASE_URL        (your central Supabase project URL)
+# - CENTRAL_SUPABASE_SERVICE_KEY (service role key for central DB)
+# - ENCRYPTION_KEY               (32-byte base64 key for API key decryption)
+#
+# Optional (for Google Custom Search topic discovery):
+# - GOOGLE_SEARCH_API_KEY        (Google Cloud API key)
+# - GOOGLE_SEARCH_CX_ID          (Custom Search Engine ID)
 
 # Optional: KV namespace for caching
 # [[kv_namespaces]]

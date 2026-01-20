@@ -4,17 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ScanWebsiteButton } from "./scan-button";
 
 import {
   Settings,
   FileText,
-  Key,
   BarChart3,
   Clock,
-  Globe,
-  Zap,
   ArrowLeft,
   ExternalLink,
+  Search,
+  Tag,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +61,13 @@ export default async function WebsiteDetailPage({ params }: Props) {
   const apiKeysStatus = apiKeysResponse?.ok
     ? await apiKeysResponse.json()
     : { configured: false };
+
+  // Get website scan data
+  const { data: websiteScan } = await supabase
+    .from("website_scans")
+    .select("*")
+    .eq("website_id", id)
+    .single();
 
   return (
     <div className="flex flex-col">
@@ -183,18 +190,6 @@ export default async function WebsiteDetailPage({ params }: Props) {
             </Card>
           </Link>
 
-          <Link href={`/dashboard/websites/${id}/api-keys`}>
-            <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
-              <CardHeader>
-                <Key className="h-8 w-8 text-primary mb-2" />
-                <CardTitle className="text-base">API Keys</CardTitle>
-                <CardDescription>
-                  Configure AI and database credentials
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-
           <Link href={`/dashboard/websites/${id}/logs`}>
             <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
               <CardHeader>
@@ -207,6 +202,94 @@ export default async function WebsiteDetailPage({ params }: Props) {
             </Card>
           </Link>
         </div>
+
+        {/* Website Content Analysis */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Search className="h-5 w-5" />
+                  Website Content Analysis
+                </CardTitle>
+                <CardDescription>
+                  Scanned content themes and keywords for accurate topic generation
+                </CardDescription>
+              </div>
+              <ScanWebsiteButton websiteId={id} />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {websiteScan && websiteScan.scan_status === "completed" ? (
+              <div className="space-y-4">
+                {websiteScan.niche_description && (
+                  <div>
+                    <h4 className="font-medium text-sm mb-1">Detected Niche</h4>
+                    <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                      {websiteScan.niche_description}
+                    </p>
+                  </div>
+                )}
+
+                {websiteScan.content_themes && websiteScan.content_themes.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-sm mb-2">Content Themes</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {websiteScan.content_themes.map((theme: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                        >
+                          {theme}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {websiteScan.main_keywords && websiteScan.main_keywords.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-sm mb-2">Extracted Keywords</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {websiteScan.main_keywords.slice(0, 15).map((keyword: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs"
+                        >
+                          <Tag className="h-3 w-3 mr-1" />
+                          {keyword}
+                        </span>
+                      ))}
+                      {websiteScan.main_keywords.length > 15 && (
+                        <span className="text-xs text-muted-foreground">
+                          +{websiteScan.main_keywords.length - 15} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-xs text-muted-foreground pt-2 border-t">
+                  Last scanned: {new Date(websiteScan.last_scanned_at).toLocaleString()} •
+                  Pages scanned: {websiteScan.pages_scanned}
+                </div>
+              </div>
+            ) : websiteScan && websiteScan.scan_status === "scanning" ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                Scanning website content...
+              </div>
+            ) : websiteScan && websiteScan.scan_status === "failed" ? (
+              <div className="text-sm text-red-600">
+                Scan failed: {websiteScan.error_message || "Unknown error"}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No scan data yet. Click &quot;Scan Website&quot; to analyze content for better topic generation.
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Recent Activity */}
         <Card>
