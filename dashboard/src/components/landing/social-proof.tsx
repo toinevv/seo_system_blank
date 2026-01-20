@@ -1,5 +1,5 @@
 import { ExternalLink } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { unstable_noStore as noStore } from "next/cache";
 
 interface SocialProofWebsite {
   id: string;
@@ -15,48 +15,52 @@ interface SocialProofStat {
   suffix: string;
 }
 
-async function getSocialProofData() {
-  const supabase = await createClient();
-
-  const [websitesResult, statsResult] = await Promise.all([
-    supabase
-      .from("social_proof_websites")
-      .select("id, name, domain, logo_url")
-      .eq("is_active", true)
-      .order("display_order", { ascending: true }),
-    supabase
-      .from("social_proof_stats")
-      .select("id, label, value, suffix")
-      .eq("is_active", true)
-      .order("display_order", { ascending: true }),
-  ]);
-
-  return {
-    websites: (websitesResult.data as SocialProofWebsite[]) || [],
-    stats: (statsResult.data as SocialProofStat[]) || [],
-  };
-}
-
 // Fallback data if Supabase is not configured
-const fallbackStats = [
+const fallbackStats: SocialProofStat[] = [
   { id: "1", value: "500", suffix: "+", label: "Articles Generated" },
   { id: "2", value: "50", suffix: "+", label: "Keywords Ranking" },
   { id: "3", value: "10", suffix: "", label: "Websites Indexed" },
 ];
 
-export async function SocialProof() {
-  let websites: SocialProofWebsite[] = [];
-  let stats: SocialProofStat[] = fallbackStats;
+async function getSocialProofData(): Promise<{
+  websites: SocialProofWebsite[];
+  stats: SocialProofStat[];
+}> {
+  // Skip during build time when env vars aren't available
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return { websites: [], stats: fallbackStats };
+  }
 
   try {
-    const data = await getSocialProofData();
-    websites = data.websites;
-    if (data.stats.length > 0) {
-      stats = data.stats;
-    }
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+
+    const [websitesResult, statsResult] = await Promise.all([
+      supabase
+        .from("social_proof_websites")
+        .select("id, name, domain, logo_url")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true }),
+      supabase
+        .from("social_proof_stats")
+        .select("id, label, value, suffix")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true }),
+    ]);
+
+    return {
+      websites: (websitesResult.data as SocialProofWebsite[]) || [],
+      stats: statsResult.data?.length ? (statsResult.data as SocialProofStat[]) : fallbackStats,
+    };
   } catch {
-    // Use fallback data if Supabase fetch fails
+    return { websites: [], stats: fallbackStats };
   }
+}
+
+export async function SocialProof() {
+  noStore(); // Ensure this is always dynamic at runtime
+
+  const { websites, stats } = await getSocialProofData();
 
   return (
     <section className="py-16 px-4">
