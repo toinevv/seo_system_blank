@@ -9,10 +9,6 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -47,6 +43,7 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Landing page colors
         landing: {
           bg: "hsl(var(--landing-bg))",
           "bg-alt": "hsl(var(--landing-bg-alt))",
@@ -64,17 +61,9 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
-      fontSize: {
-        'xs': ['0.6875rem', { lineHeight: '1rem' }],
-        'sm': ['0.75rem', { lineHeight: '1.125rem' }],
-        'base': ['0.8125rem', { lineHeight: '1.25rem' }],
-        'lg': ['0.875rem', { lineHeight: '1.375rem' }],
-        'xl': ['1rem', { lineHeight: '1.5rem' }],
-        '2xl': ['1.25rem', { lineHeight: '1.75rem' }],
-        '3xl': ['1.5rem', { lineHeight: '2rem' }],
-      },
-      letterSpacing: {
-        'widest': '0.1em',
+      fontFamily: {
+        sans: ["IBM Plex Sans", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
     },
   },

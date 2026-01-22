@@ -43,6 +43,18 @@ export function LandingNav() {
               Pricing
             </Link>
             <Link
+              href="/blog"
+              className="text-xs text-landing-text-muted hover:text-landing-text transition-colors"
+            >
+              Blog
+            </Link>
+            <Link
+              href="/docs"
+              className="text-xs text-landing-text-muted hover:text-landing-text transition-colors"
+            >
+              Docs
+            </Link>
+            <Link
               href="#faq"
               className="text-xs text-landing-text-muted hover:text-landing-text transition-colors"
             >
@@ -97,6 +109,20 @@ export function LandingNav() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Pricing
+              </Link>
+              <Link
+                href="/blog"
+                className="text-sm text-landing-text-muted hover:text-landing-text"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Blog
+              </Link>
+              <Link
+                href="/docs"
+                className="text-sm text-landing-text-muted hover:text-landing-text"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Docs
               </Link>
               <Link
                 href="#faq"

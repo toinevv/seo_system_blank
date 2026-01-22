@@ -30,6 +30,12 @@ export function Footer() {
               Pricing
             </Link>
             <Link
+              href="/blog"
+              className="text-xs text-landing-text-muted hover:text-landing-text transition-colors"
+            >
+              Blog
+            </Link>
+            <Link
               href="/login"
               className="text-xs text-landing-text-muted hover:text-landing-text transition-colors"
             >
