@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/card";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
-export default function SignupPage() {
+function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -220,5 +220,29 @@ export default function SignupPage() {
         </form>
       </Card>
     </div>
+  );
+}
+
+function SignupLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
+          <CardDescription>Loading...</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<SignupLoading />}>
+      <SignupForm />
+    </Suspense>
   );
 }

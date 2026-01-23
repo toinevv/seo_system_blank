@@ -586,19 +586,6 @@ GRANT ALL ON public.blog_articles TO service_role;`;
                   </div>
                 </div>
 
-                {sqlEditorUrl && (
-                  <div className="pt-4 border-t">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Make sure you&apos;ve run the SQL in your Supabase project:
-                    </p>
-                    <a href={sqlEditorUrl} target="_blank" rel="noopener noreferrer">
-                      <Button type="button" variant="outline" size="sm" className="flex items-center gap-2">
-                        <ExternalLink className="h-4 w-4" />
-                        Open SQL Editor
-                      </Button>
-                    </a>
-                  </div>
-                )}
               </div>
             )}
           </CardContent>
