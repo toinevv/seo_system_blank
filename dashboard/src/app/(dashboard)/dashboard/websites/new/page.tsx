@@ -36,7 +36,7 @@ const extractSupabaseProjectId = (url: string): string | null => {
   return match ? match[1] : null;
 };
 
-type Step = "basic" | "database" | "review";
+type Step = "basic" | "database" | "frontend" | "review";
 
 export default function NewWebsitePage() {
   const router = useRouter();
@@ -45,6 +45,7 @@ export default function NewWebsitePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sqlCopied, setSqlCopied] = useState(false);
+  const [frontendCopied, setFrontendCopied] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -153,6 +154,7 @@ export default function NewWebsitePage() {
   const steps: { key: Step; title: string; description: string }[] = [
     { key: "basic", title: "Basic Info", description: "Website name and settings" },
     { key: "database", title: "Database Setup", description: "Connect and configure your database" },
+    { key: "frontend", title: "Frontend Guide", description: "How to display your blog" },
     { key: "review", title: "Review", description: "Confirm and create" },
   ];
 
@@ -163,6 +165,8 @@ export default function NewWebsitePage() {
         return formData.name && formData.domain && formData.product_id;
       case "database":
         return formData.target_supabase_url && formData.target_supabase_service_key;
+      case "frontend":
+        return true; // Guide is informational
       default:
         return true;
     }
@@ -305,6 +309,173 @@ GRANT ALL ON public.blog_articles TO service_role;`;
     await navigator.clipboard.writeText(databaseSql);
     setSqlCopied(true);
     setTimeout(() => setSqlCopied(false), 2000);
+  };
+
+  // Frontend implementation guide
+  const frontendGuide = `// =============================================================================
+// BLOG FRONTEND IMPLEMENTATION GUIDE
+// =============================================================================
+// This guide shows you how to integrate the blog system into your website.
+// Examples are in Next.js/React but the concepts apply to any framework.
+
+// -----------------------------------------------------------------------------
+// 1. SUPABASE CLIENT SETUP (lib/supabase.ts)
+// -----------------------------------------------------------------------------
+import { createClient } from '@supabase/supabase-js'
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+// -----------------------------------------------------------------------------
+// 2. FETCH ARTICLES FOR BLOG LISTING PAGE (app/blog/page.tsx)
+// -----------------------------------------------------------------------------
+export async function getBlogArticles() {
+  const { data: articles } = await supabase
+    .from('blog_articles')
+    .select('slug, title, excerpt, published_at, cover_image_url, category, read_time, author')
+    .eq('status', 'published')
+    .eq('product_id', '${formData.product_id || "YOUR_PRODUCT_ID"}')
+    .order('published_at', { ascending: false })
+
+  return articles || []
+}
+
+// -----------------------------------------------------------------------------
+// 3. FETCH SINGLE ARTICLE BY SLUG (app/blog/[slug]/page.tsx)
+// -----------------------------------------------------------------------------
+export async function getArticleBySlug(slug: string) {
+  const { data: article } = await supabase
+    .from('blog_articles')
+    .select('*')
+    .eq('slug', slug)
+    .eq('product_id', '${formData.product_id || "YOUR_PRODUCT_ID"}')
+    .eq('status', 'published')
+    .single()
+
+  return article
+}
+
+// -----------------------------------------------------------------------------
+// 4. GENERATE STATIC PATHS FOR ALL ARTICLES (for SSG)
+// -----------------------------------------------------------------------------
+export async function generateStaticParams() {
+  const { data: articles } = await supabase
+    .from('blog_articles')
+    .select('slug')
+    .eq('product_id', '${formData.product_id || "YOUR_PRODUCT_ID"}')
+    .eq('status', 'published')
+
+  return (articles || []).map((article) => ({ slug: article.slug }))
+}
+
+// -----------------------------------------------------------------------------
+// 5. SEO METADATA (app/blog/[slug]/page.tsx)
+// -----------------------------------------------------------------------------
+export async function generateMetadata({ params }) {
+  const article = await getArticleBySlug(params.slug)
+  if (!article) return {}
+
+  return {
+    title: article.title,
+    description: article.meta_description || article.excerpt,
+    openGraph: {
+      title: article.title,
+      description: article.meta_description,
+      images: article.cover_image_url ? [article.cover_image_url] : [],
+      type: 'article',
+      publishedTime: article.published_at,
+      authors: [article.author],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: article.title,
+      description: article.meta_description,
+      images: article.cover_image_url ? [article.cover_image_url] : [],
+    },
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 6. JSON-LD STRUCTURED DATA (for rich search results)
+// -----------------------------------------------------------------------------
+function ArticleJsonLd({ article }) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: article.title,
+    description: article.meta_description,
+    image: article.cover_image_url,
+    datePublished: article.published_at,
+    dateModified: article.updated_at,
+    author: {
+      '@type': 'Person',
+      name: article.author,
+    },
+    // Use FAQ schema if available (GEO optimized)
+    ...(article.faq_schema && Object.keys(article.faq_schema).length > 0
+      ? { mainEntity: article.faq_schema }
+      : {}),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  )
+}`;
+
+  const seoTips = [
+    {
+      title: "URL Structure",
+      tips: [
+        "Use clean URLs: /blog/your-article-slug",
+        "Keep slugs short, descriptive, and keyword-rich",
+        "Use hyphens, not underscores",
+      ],
+    },
+    {
+      title: "Meta Tags",
+      tips: [
+        "Unique title tag (50-60 characters)",
+        "Meta description (150-160 characters)",
+        "Open Graph tags for social sharing",
+      ],
+    },
+    {
+      title: "Content Structure",
+      tips: [
+        "Use semantic HTML (article, header, main, section)",
+        "One H1 per page (the article title)",
+        "Logical heading hierarchy (H2, H3, H4)",
+        "Include the TL;DR summary for AI search engines",
+      ],
+    },
+    {
+      title: "Performance",
+      tips: [
+        "Lazy load images below the fold",
+        "Use next/image or similar for optimization",
+        "Implement ISR (Incremental Static Regeneration)",
+      ],
+    },
+    {
+      title: "Sitemap & Internal Linking",
+      tips: [
+        "Add blog URLs to your sitemap.xml",
+        "Link between related articles",
+        "Use descriptive anchor text",
+        "The system stores internal_links for each article",
+      ],
+    },
+  ];
+
+  const copyFrontendGuide = async () => {
+    await navigator.clipboard.writeText(frontendGuide);
+    setFrontendCopied(true);
+    setTimeout(() => setFrontendCopied(false), 2000);
   };
 
   return (
@@ -552,6 +723,64 @@ GRANT ALL ON public.blog_articles TO service_role;`;
                     </div>
                   </div>
                 )}
+              </>
+            )}
+
+            {step === "frontend" && (
+              <>
+                <div className="rounded-md bg-emerald-50 border border-emerald-200 p-4 mb-4">
+                  <p className="text-sm text-emerald-800">
+                    <strong>🚀 Implementation Guide:</strong> Copy this code to integrate the blog
+                    into your {formData.domain || "website"}. Examples are in Next.js but work with any framework.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 mb-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={copyFrontendGuide}
+                    className="flex items-center gap-2"
+                  >
+                    {frontendCopied ? (
+                      <>
+                        <Check className="h-4 w-4 text-green-600" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" />
+                        Copy Code
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <div className="relative">
+                  <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-72 overflow-y-auto">
+                    <code>{frontendGuide}</code>
+                  </pre>
+                </div>
+
+                {/* SEO Best Practices */}
+                <div className="border-t pt-6 mt-6">
+                  <h3 className="font-semibold mb-4">SEO Best Practices for Findability</h3>
+                  <div className="grid gap-4">
+                    {seoTips.map((section) => (
+                      <div key={section.title} className="rounded-md border p-4">
+                        <h4 className="font-medium text-sm mb-2">{section.title}</h4>
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          {section.tips.map((tip, i) => (
+                            <li key={i} className="flex items-start gap-2">
+                              <span className="text-emerald-600 mt-0.5">•</span>
+                              {tip}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </>
             )}
 
