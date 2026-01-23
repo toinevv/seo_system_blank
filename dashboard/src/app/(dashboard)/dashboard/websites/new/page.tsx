@@ -143,7 +143,17 @@ export default function NewWebsitePage() {
         throw new Error(data.error || "Failed to save API keys");
       }
 
-      router.push(`/dashboard/websites/${website.id}`);
+      // Trigger automatic onboarding (scan → discover topics → generate content)
+      try {
+        await fetch(`/api/v1/websites/${website.id}/onboard`, {
+          method: "POST",
+        });
+      } catch (onboardErr) {
+        console.error("Failed to start onboarding:", onboardErr);
+        // Continue anyway - user can manually trigger later
+      }
+
+      router.push(`/dashboard/websites/${website.id}?onboarding=true`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create website");

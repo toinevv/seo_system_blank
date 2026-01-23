@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ScanWebsiteButton } from "./scan-button";
+import { OnboardingProgressWrapper } from "./onboarding-wrapper";
 
 import {
   Settings,
@@ -22,6 +23,7 @@ export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ onboarding?: string }>;
 }
 
 export default async function WebsiteDetailPage({ params }: Props) {
