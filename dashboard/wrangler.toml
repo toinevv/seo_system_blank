@@ -20,16 +20,19 @@ enabled = true
 enabled = true
 invocation_logs = true
 
-# Environment variables (set in Cloudflare Dashboard)
+# Environment variables
+# IMPORTANT: NEXT_PUBLIC_* vars must also be set in Domaly/Cloudflare build settings
+# because Next.js inlines them at build time into the client bundle.
 [vars]
 ENVIRONMENT = "production"
 NEXT_PUBLIC_GA_ID = "G-XXXXXXXXXX"
+# These are public values (safe to commit) - the anon key only allows RLS-protected access
+NEXT_PUBLIC_SUPABASE_URL = "https://fvtkaqqpbkvgftjcartz.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2dGthcXFwYmt2Z2Z0amNhcnR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzODY2NjIsImV4cCI6MjA4Mzk2MjY2Mn0.8Y8E3pX64fh6Agt8FzJgHmkXeZpjEhWTAdjyY0WrCg8"
 
 # Secrets (set via wrangler secret put SECRET_NAME)
 # Run these commands to set secrets:
 #   cd dashboard
-#   npx wrangler secret put NEXT_PUBLIC_SUPABASE_URL
-#   npx wrangler secret put NEXT_PUBLIC_SUPABASE_ANON_KEY
 #   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 #   npx wrangler secret put ENCRYPTION_KEY
 #   npx wrangler secret put STRIPE_SECRET_KEY
