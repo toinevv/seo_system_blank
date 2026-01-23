@@ -2,7 +2,6 @@ import { Hero } from "@/components/landing/hero";
 import { ProblemSection } from "@/components/landing/problem-section";
 import { Features } from "@/components/landing/features";
 import { HowItWorks } from "@/components/landing/how-it-works";
-import { CLIQuickstart } from "@/components/landing/cli-quickstart";
 import { SocialProof } from "@/components/landing/social-proof";
 import { LatestArticles } from "@/components/landing/latest-articles";
 import { PricingTable } from "@/components/landing/pricing-table";
@@ -19,7 +18,6 @@ export default function LandingPage() {
       <ProblemSection />
       <Features />
       <HowItWorks />
-      <CLIQuickstart />
       <SocialProof />
       <LatestArticles />
       <PricingTable />
