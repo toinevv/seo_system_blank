@@ -36,7 +36,7 @@ const extractSupabaseProjectId = (url: string): string | null => {
   return match ? match[1] : null;
 };
 
-type Step = "basic" | "database" | "sql-setup" | "review";
+type Step = "basic" | "database" | "review";
 
 export default function NewWebsitePage() {
   const router = useRouter();
@@ -45,6 +45,9 @@ export default function NewWebsitePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sqlCopied, setSqlCopied] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -149,8 +152,7 @@ export default function NewWebsitePage() {
 
   const steps: { key: Step; title: string; description: string }[] = [
     { key: "basic", title: "Basic Info", description: "Website name and settings" },
-    { key: "database", title: "Target Database", description: "Where to store articles" },
-    { key: "sql-setup", title: "Database Setup", description: "Create the articles table" },
+    { key: "database", title: "Database Setup", description: "Connect and configure your database" },
     { key: "review", title: "Review", description: "Confirm and create" },
   ];
 
@@ -161,10 +163,51 @@ export default function NewWebsitePage() {
         return formData.name && formData.domain && formData.product_id;
       case "database":
         return formData.target_supabase_url && formData.target_supabase_service_key;
-      case "sql-setup":
-        return true; // SQL setup is informational, they can proceed
       default:
         return true;
+    }
+  };
+
+  // Test connection to the target Supabase database
+  const testConnection = async () => {
+    setTestingConnection(true);
+    setConnectionStatus("idle");
+    setConnectionError(null);
+
+    try {
+      const { createClient: createTargetClient } = await import("@supabase/supabase-js");
+      const targetSupabase = createTargetClient(
+        formData.target_supabase_url,
+        formData.target_supabase_service_key
+      );
+
+      // Try to query the blog_articles table (or check if it exists)
+      const { error } = await targetSupabase
+        .from("blog_articles")
+        .select("id")
+        .limit(1);
+
+      if (error) {
+        // Table doesn't exist yet - that's expected, they need to run the SQL
+        if (error.code === "42P01" || error.message?.includes("does not exist")) {
+          setConnectionStatus("success");
+          setConnectionError("Connection successful! The blog_articles table doesn't exist yet - run the SQL below to create it.");
+        } else if (error.code === "PGRST301" || error.message?.includes("permission")) {
+          setConnectionStatus("error");
+          setConnectionError("Connection failed: Permission denied. Make sure you're using the service_role key, not the anon key.");
+        } else {
+          setConnectionStatus("error");
+          setConnectionError(`Connection error: ${error.message}`);
+        }
+      } else {
+        setConnectionStatus("success");
+        setConnectionError("Connection successful! The blog_articles table already exists.");
+      }
+    } catch (err) {
+      setConnectionStatus("error");
+      setConnectionError(err instanceof Error ? err.message : "Failed to connect. Check your URL and key.");
+    } finally {
+      setTestingConnection(false);
     }
   };
 
@@ -388,6 +431,7 @@ GRANT ALL ON public.blog_articles TO service_role;`;
 
             {step === "database" && (
               <>
+                {/* Credentials Section */}
                 <div className="rounded-md bg-muted p-4 mb-4">
                   <p className="text-sm">
                     Enter the Supabase credentials for the <strong>target website</strong> where
@@ -401,7 +445,10 @@ GRANT ALL ON public.blog_articles TO service_role;`;
                     id="target_supabase_url"
                     placeholder="https://xxxxx.supabase.co"
                     value={formData.target_supabase_url}
-                    onChange={(e) => updateField("target_supabase_url", e.target.value)}
+                    onChange={(e) => {
+                      updateField("target_supabase_url", e.target.value);
+                      setConnectionStatus("idle");
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -411,66 +458,100 @@ GRANT ALL ON public.blog_articles TO service_role;`;
                     type="password"
                     placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                     value={formData.target_supabase_service_key}
-                    onChange={(e) => updateField("target_supabase_service_key", e.target.value)}
+                    onChange={(e) => {
+                      updateField("target_supabase_service_key", e.target.value);
+                      setConnectionStatus("idle");
+                    }}
                   />
                   <p className="text-xs text-muted-foreground">
                     Find this in Supabase Dashboard → Settings → API → service_role key
                   </p>
                 </div>
-              </>
-            )}
 
-            {step === "sql-setup" && (
-              <>
-                <div className="rounded-md bg-blue-50 border border-blue-200 p-4 mb-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>📋 One-time setup:</strong> Copy the SQL below and run it in your Supabase SQL Editor
-                    to create the <code className="bg-blue-100 px-1 rounded">blog_articles</code> table.
-                  </p>
-                </div>
-
-                <div className="flex gap-2 mb-3">
+                {/* Test Connection Button */}
+                <div className="pt-2">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={copyToClipboard}
+                    onClick={testConnection}
+                    disabled={!formData.target_supabase_url || !formData.target_supabase_service_key || testingConnection}
                     className="flex items-center gap-2"
                   >
-                    {sqlCopied ? (
+                    {testingConnection ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Testing...
+                      </>
+                    ) : connectionStatus === "success" ? (
                       <>
                         <Check className="h-4 w-4 text-green-600" />
-                        Copied!
+                        Connection OK
                       </>
                     ) : (
-                      <>
-                        <Copy className="h-4 w-4" />
-                        Copy SQL
-                      </>
+                      "Test Connection"
                     )}
                   </Button>
-
-                  {sqlEditorUrl && (
-                    <a href={sqlEditorUrl} target="_blank" rel="noopener noreferrer">
-                      <Button type="button" variant="default" className="flex items-center gap-2">
-                        <ExternalLink className="h-4 w-4" />
-                        Open SQL Editor
-                      </Button>
-                    </a>
+                  {connectionError && (
+                    <p className={`text-sm mt-2 ${connectionStatus === "success" ? "text-green-600" : "text-destructive"}`}>
+                      {connectionError}
+                    </p>
                   )}
                 </div>
 
-                <div className="relative">
-                  <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-80 overflow-y-auto">
-                    <code>{databaseSql}</code>
-                  </pre>
-                </div>
+                {/* SQL Setup Section - only show after credentials are entered */}
+                {formData.target_supabase_url && formData.target_supabase_service_key && (
+                  <div className="border-t pt-6 mt-6">
+                    <div className="rounded-md bg-blue-50 border border-blue-200 p-4 mb-4">
+                      <p className="text-sm text-blue-800">
+                        <strong>📋 One-time setup:</strong> Copy the SQL below and run it in your Supabase SQL Editor
+                        to create the <code className="bg-blue-100 px-1 rounded">blog_articles</code> table.
+                      </p>
+                    </div>
 
-                <div className="rounded-md bg-amber-50 border border-amber-200 p-4 mt-4">
-                  <p className="text-sm text-amber-800">
-                    <strong>💡 Tip:</strong> Click &quot;Open SQL Editor&quot; to go directly to your project&apos;s
-                    SQL editor, paste the SQL, and click &quot;Run&quot;. The table will be created automatically.
-                  </p>
-                </div>
+                    <div className="flex gap-2 mb-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={copyToClipboard}
+                        className="flex items-center gap-2"
+                      >
+                        {sqlCopied ? (
+                          <>
+                            <Check className="h-4 w-4 text-green-600" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4" />
+                            Copy SQL
+                          </>
+                        )}
+                      </Button>
+
+                      {sqlEditorUrl && (
+                        <a href={sqlEditorUrl} target="_blank" rel="noopener noreferrer">
+                          <Button type="button" variant="default" className="flex items-center gap-2">
+                            <ExternalLink className="h-4 w-4" />
+                            Open SQL Editor
+                          </Button>
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-64 overflow-y-auto">
+                        <code>{databaseSql}</code>
+                      </pre>
+                    </div>
+
+                    <div className="rounded-md bg-amber-50 border border-amber-200 p-4 mt-4">
+                      <p className="text-sm text-amber-800">
+                        <strong>💡 Tip:</strong> Click &quot;Open SQL Editor&quot;, paste the SQL, and click &quot;Run&quot;.
+                        Then use &quot;Test Connection&quot; above to verify it worked.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 

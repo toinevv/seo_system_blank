@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -23,15 +24,37 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const router = useRouter();
+  const [checkoutEmail, setCheckoutEmail] = useState<string | null>(null);
+  const [linkingSubscription, setLinkingSubscription] = useState(false);
+
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  // Check if coming from successful checkout
+  const checkoutSuccess = searchParams.get("checkout") === "success";
+  const sessionId = searchParams.get("session_id");
+
+  // Fetch checkout session email if coming from payment
+  useEffect(() => {
+    if (checkoutSuccess && sessionId) {
+      fetch(`/api/stripe/session?session_id=${sessionId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.email) {
+            setCheckoutEmail(data.email);
+            setEmail(data.email);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [checkoutSuccess, sessionId]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error: signupError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -41,10 +64,31 @@ export default function SignupPage() {
       },
     });
 
-    if (error) {
-      setError(error.message);
+    if (signupError) {
+      setError(signupError.message);
       setLoading(false);
       return;
+    }
+
+    // If coming from checkout, link the subscription to the new user
+    if (checkoutSuccess && sessionId && data.user) {
+      setLinkingSubscription(true);
+      try {
+        const linkResponse = await fetch("/api/stripe/link-subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+
+        if (!linkResponse.ok) {
+          const linkData = await linkResponse.json();
+          console.error("Failed to link subscription:", linkData.error);
+          // Don't fail signup, subscription can be linked later via email matching
+        }
+      } catch (err) {
+        console.error("Error linking subscription:", err);
+      }
+      setLinkingSubscription(false);
     }
 
     setSuccess(true);
@@ -56,9 +100,17 @@ export default function SignupPage() {
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-6 w-6 text-green-500" />
+              <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
+            </div>
             <CardDescription>
               We&apos;ve sent you a confirmation link. Please check your email to verify your account.
+              {checkoutSuccess && (
+                <span className="block mt-2 text-green-600 font-medium">
+                  Your subscription is ready and will be activated once you verify your email!
+                </span>
+              )}
             </CardDescription>
           </CardHeader>
           <CardFooter>
@@ -77,10 +129,25 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
-          <CardDescription>
-            Enter your details to create your SEO Dashboard account
-          </CardDescription>
+          {checkoutSuccess ? (
+            <>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                <span className="text-sm font-medium text-green-600">Payment successful!</span>
+              </div>
+              <CardTitle className="text-2xl font-bold">Complete your account</CardTitle>
+              <CardDescription>
+                Create your account to activate your subscription and start generating SEO content.
+              </CardDescription>
+            </>
+          ) : (
+            <>
+              <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
+              <CardDescription>
+                Enter your details to create your SEO Dashboard account
+              </CardDescription>
+            </>
+          )}
         </CardHeader>
         <form onSubmit={handleSignup}>
           <CardContent className="space-y-4">
@@ -109,7 +176,13 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={!!checkoutEmail}
               />
+              {checkoutEmail && (
+                <p className="text-xs text-muted-foreground">
+                  Using the email from your payment
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
@@ -125,8 +198,17 @@ export default function SignupPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Create account"}
+            <Button type="submit" className="w-full" disabled={loading || linkingSubscription}>
+              {loading || linkingSubscription ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {linkingSubscription ? "Activating subscription..." : "Creating account..."}
+                </>
+              ) : checkoutSuccess ? (
+                "Create account & activate subscription"
+              ) : (
+                "Create account"
+              )}
             </Button>
             <p className="text-sm text-muted-foreground">
               Already have an account?{" "}
