@@ -432,11 +432,6 @@ iyn scan && iyn topics --discover && iyn generate -y
           )}
         </div>
 
-        {/* Footer message */}
-        <div className="text-[10px] text-emerald-700 flex items-center gap-1">
-          <span>✨</span>
-          <span><strong>No API keys needed</strong> - AI content generation included!</span>
-        </div>
       </CardContent>
     </Card>
   );
