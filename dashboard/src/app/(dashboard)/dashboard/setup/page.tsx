@@ -258,6 +258,7 @@ function QuickSetupCard() {
   const [copied, setCopied] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [justCreated, setJustCreated] = useState<string | null>(null);
+  const [showFullPrompt, setShowFullPrompt] = useState(false);
 
   // Fetch existing API key or create one
   useEffect(() => {
@@ -359,90 +360,82 @@ iyn scan && iyn topics --discover && iyn generate -y
 
   return (
     <Card className="border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+      <CardContent className="p-4 space-y-3">
+        {/* Header row with domain input */}
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center shrink-0">
             <Sparkles className="h-4 w-4 text-emerald-600" />
           </div>
-          <div>
-            <CardTitle className="text-sm">Quick Setup</CardTitle>
-            <p className="text-xs text-muted-foreground">Copy & paste to your AI agent</p>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-600">Domain:</span>
+              <Input
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder="example.com"
+                className="font-mono text-xs h-7 flex-1 max-w-[180px]"
+              />
+            </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Warning if key was just created */}
-        {justCreated && (
-          <div className="bg-amber-50 border border-amber-200 rounded-[4px] p-2 text-xs">
-            <strong className="text-amber-700">⚠️ Save this key!</strong>
-            <span className="text-amber-600 ml-1">You won&apos;t see the full key again.</span>
-          </div>
-        )}
-
-        {/* Domain input */}
-        <div>
-          <label className="text-xs font-medium text-gray-600 mb-1 block">Your domain</label>
-          <Input
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-            placeholder="example.com"
-            className="font-mono text-xs h-8"
-          />
+          {justCreated && (
+            <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">⚠️ Key shown once</span>
+          )}
         </div>
 
-        {/* Section 1: Full Comprehensive Prompt */}
-        <div className="pt-2 border-t border-purple-200">
-          <div className="flex items-center justify-between mb-1.5">
+        {/* CLI Command - always visible */}
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-2.5 rounded-[6px] overflow-x-auto text-[10px] font-mono whitespace-pre-wrap break-all pr-16">
+            {setupCommand}
+          </pre>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={copyCommand}
+            className="absolute top-1.5 right-1.5 h-6 px-2 bg-gray-800 hover:bg-gray-700 text-white text-[10px]"
+          >
+            {copied ? <><Check className="h-3 w-3 mr-1" />Copied!</> : <><Copy className="h-3 w-3 mr-1" />Copy</>}
+          </Button>
+        </div>
+
+        {/* Collapsible Full Prompt */}
+        <div className="border-t pt-2">
+          <button
+            onClick={() => setShowFullPrompt(!showFullPrompt)}
+            className="flex items-center justify-between w-full text-left hover:bg-purple-50 rounded p-1.5 -m-1.5 transition-colors"
+          >
             <div className="flex items-center gap-1.5">
               <Bot className="h-3.5 w-3.5 text-purple-600" />
-              <span className="text-xs font-semibold text-purple-800">Full AI Agent Prompt</span>
+              <span className="text-xs font-medium text-purple-800">Full AI Agent Prompt</span>
+              <span className="text-[9px] text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">SQL + Credentials + Steps</span>
             </div>
-            <span className="text-[10px] text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">Everything included</span>
-          </div>
-          <p className="text-[10px] text-gray-500 mb-2">Copy this to Cursor, Windsurf, or any AI coding assistant - includes SQL, credentials, everything.</p>
-          <div className="relative">
-            <pre className="bg-purple-950 text-purple-100 p-3 rounded-[6px] overflow-x-auto text-[10px] font-mono whitespace-pre-wrap max-h-48 overflow-y-auto">
-              {fullPrompt}
-            </pre>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={copyFullPrompt}
-              className="absolute top-1.5 right-1.5 h-6 px-2 bg-purple-900 hover:bg-purple-800 text-white text-[10px]"
-            >
-              {copiedPrompt ? <><Check className="h-3 w-3 mr-1" />Copied!</> : <><Copy className="h-3 w-3 mr-1" />Copy All</>}
-            </Button>
-          </div>
+            {showFullPrompt ? (
+              <ChevronDown className="h-4 w-4 text-purple-600" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-purple-600" />
+            )}
+          </button>
+
+          {showFullPrompt && (
+            <div className="mt-2 relative">
+              <pre className="bg-purple-950 text-purple-100 p-3 rounded-[6px] overflow-x-auto text-[10px] font-mono whitespace-pre-wrap max-h-64 overflow-y-auto pr-16">
+                {fullPrompt}
+              </pre>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={copyFullPrompt}
+                className="absolute top-1.5 right-1.5 h-6 px-2 bg-purple-900 hover:bg-purple-800 text-white text-[10px]"
+              >
+                {copiedPrompt ? <><Check className="h-3 w-3 mr-1" />Copied!</> : <><Copy className="h-3 w-3 mr-1" />Copy All</>}
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Section 2: Quick CLI Command */}
-        <div className="pt-3 border-t">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1.5">
-              <Terminal className="h-3.5 w-3.5 text-gray-600" />
-              <span className="text-xs font-semibold text-gray-700">Quick CLI Command</span>
-            </div>
-            <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">One-liner</span>
-          </div>
-          <p className="text-[10px] text-gray-500 mb-2">Just the command - use if you already have Supabase set up.</p>
-          <div className="relative">
-            <pre className="bg-gray-900 text-gray-100 p-3 rounded-[6px] overflow-x-auto text-[10px] font-mono whitespace-pre-wrap break-all">
-              {setupCommand}
-            </pre>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={copyCommand}
-              className="absolute top-1.5 right-1.5 h-6 px-2 bg-gray-800 hover:bg-gray-700 text-white text-[10px]"
-            >
-              {copied ? <><Check className="h-3 w-3 mr-1" />Copied!</> : <><Copy className="h-3 w-3 mr-1" />Copy</>}
-            </Button>
-          </div>
-        </div>
-
-        {/* What it does */}
-        <div className="bg-emerald-50 border border-emerald-200 rounded-[4px] p-2 text-[10px] text-emerald-700">
-          <span className="font-medium">✨ No API keys needed:</span> AI content generation is included with your subscription!
+        {/* Footer message */}
+        <div className="text-[10px] text-emerald-700 flex items-center gap-1">
+          <span>✨</span>
+          <span><strong>No API keys needed</strong> - AI content generation included!</span>
         </div>
       </CardContent>
     </Card>
