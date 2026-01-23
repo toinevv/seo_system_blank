@@ -101,6 +101,29 @@ GRANT SELECT ON public.blog_articles TO anon;
 GRANT ALL ON public.blog_articles TO authenticated;
 GRANT ALL ON public.blog_articles TO service_role;`;
 
+// Simplified SQL for the full prompt (minimal but functional)
+const MINIMAL_SQL = `CREATE TABLE IF NOT EXISTS public.blog_articles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    excerpt TEXT,
+    meta_description TEXT,
+    cover_image_url TEXT,
+    tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+    published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    status TEXT DEFAULT 'published',
+    author TEXT,
+    tldr TEXT,
+    faq_items JSONB DEFAULT '[]'::JSONB,
+    CONSTRAINT blog_articles_slug_product_unique UNIQUE(slug, product_id)
+);
+
+ALTER TABLE public.blog_articles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public can read published" ON public.blog_articles FOR SELECT USING (status = 'published');
+GRANT SELECT ON public.blog_articles TO anon;`;
+
 const FRONTEND_PROMPT = `I have a Supabase database with a blog_articles table for my website. Help me create:
 
 1. A /blog page that lists all published articles
@@ -290,9 +313,26 @@ function QuickSetupCard() {
     ? `INDEXYOURNICHE_API_KEY=${apiKey} npx @indexyourniche/cli init -y -d ${domain} && iyn scan && iyn topics --discover && iyn generate -y`
     : "";
 
-  const agentPrompt = `Add SEO to my project with IndexYourNiche. Run this command:
+  // Full comprehensive prompt with everything
+  const fullPrompt = `Set up IndexYourNiche SEO automation for this project.
 
-${setupCommand}`;
+## Step 1: Run the CLI Setup
+${setupCommand}
+
+## Step 2: Add Supabase Credentials to .env.local
+Get these from your Supabase Dashboard → Settings → API:
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...
+
+## Step 3: Create Articles Table
+Run this SQL in your Supabase SQL Editor:
+
+${MINIMAL_SQL}
+
+## Step 4: Generate Content
+iyn scan && iyn topics --discover && iyn generate -y
+
+✨ AI content generation is INCLUDED - no OpenAI/Anthropic keys needed!`;
 
   const copyCommand = () => {
     navigator.clipboard.writeText(setupCommand);
@@ -300,8 +340,8 @@ ${setupCommand}`;
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const copyPrompt = () => {
-    navigator.clipboard.writeText(agentPrompt);
+  const copyFullPrompt = () => {
+    navigator.clipboard.writeText(fullPrompt);
     setCopiedPrompt(true);
     setTimeout(() => setCopiedPrompt(false), 2000);
   };
@@ -350,45 +390,59 @@ ${setupCommand}`;
           />
         </div>
 
-        {/* Command preview */}
-        <div className="relative">
-          <pre className="bg-gray-900 text-gray-100 p-3 rounded-[6px] overflow-x-auto text-[10px] font-mono whitespace-pre-wrap break-all">
-            {setupCommand}
-          </pre>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={copyCommand}
-            className="absolute top-1.5 right-1.5 h-6 px-2 bg-gray-800 hover:bg-gray-700 text-white text-[10px]"
-          >
-            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-          </Button>
-        </div>
-
-        {/* AI Agent prompt */}
-        <div className="pt-2 border-t">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Bot className="h-3 w-3 text-purple-600" />
-            <span className="text-xs font-medium text-gray-600">For AI Agents</span>
+        {/* Section 1: Full Comprehensive Prompt */}
+        <div className="pt-2 border-t border-purple-200">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Bot className="h-3.5 w-3.5 text-purple-600" />
+              <span className="text-xs font-semibold text-purple-800">Full AI Agent Prompt</span>
+            </div>
+            <span className="text-[10px] text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">Everything included</span>
           </div>
+          <p className="text-[10px] text-gray-500 mb-2">Copy this to Cursor, Windsurf, or any AI coding assistant - includes SQL, credentials, everything.</p>
           <div className="relative">
-            <pre className="bg-purple-950 text-purple-100 p-3 rounded-[6px] overflow-x-auto text-[10px] font-mono whitespace-pre-wrap">
-              {agentPrompt}
+            <pre className="bg-purple-950 text-purple-100 p-3 rounded-[6px] overflow-x-auto text-[10px] font-mono whitespace-pre-wrap max-h-48 overflow-y-auto">
+              {fullPrompt}
             </pre>
             <Button
               size="sm"
               variant="ghost"
-              onClick={copyPrompt}
+              onClick={copyFullPrompt}
               className="absolute top-1.5 right-1.5 h-6 px-2 bg-purple-900 hover:bg-purple-800 text-white text-[10px]"
             >
-              {copiedPrompt ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {copiedPrompt ? <><Check className="h-3 w-3 mr-1" />Copied!</> : <><Copy className="h-3 w-3 mr-1" />Copy All</>}
+            </Button>
+          </div>
+        </div>
+
+        {/* Section 2: Quick CLI Command */}
+        <div className="pt-3 border-t">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Terminal className="h-3.5 w-3.5 text-gray-600" />
+              <span className="text-xs font-semibold text-gray-700">Quick CLI Command</span>
+            </div>
+            <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">One-liner</span>
+          </div>
+          <p className="text-[10px] text-gray-500 mb-2">Just the command - use if you already have Supabase set up.</p>
+          <div className="relative">
+            <pre className="bg-gray-900 text-gray-100 p-3 rounded-[6px] overflow-x-auto text-[10px] font-mono whitespace-pre-wrap break-all">
+              {setupCommand}
+            </pre>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={copyCommand}
+              className="absolute top-1.5 right-1.5 h-6 px-2 bg-gray-800 hover:bg-gray-700 text-white text-[10px]"
+            >
+              {copied ? <><Check className="h-3 w-3 mr-1" />Copied!</> : <><Copy className="h-3 w-3 mr-1" />Copy</>}
             </Button>
           </div>
         </div>
 
         {/* What it does */}
-        <div className="bg-gray-50 rounded-[4px] p-2 text-[10px] text-gray-600">
-          <span className="font-medium">This command:</span> Connects project → Scans niche → Discovers topics → Generates first article
+        <div className="bg-emerald-50 border border-emerald-200 rounded-[4px] p-2 text-[10px] text-emerald-700">
+          <span className="font-medium">✨ No API keys needed:</span> AI content generation is included with your subscription!
         </div>
       </CardContent>
     </Card>
@@ -457,55 +511,45 @@ export default function SetupPage() {
           </div>
         </CollapsibleSection>
 
-        {/* Step 2: API Keys */}
-        <CollapsibleSection title="Step 2: Configure API Keys" icon={Key}>
+        {/* Step 2: Supabase Credentials */}
+        <CollapsibleSection title="Step 2: Supabase Credentials (Required)" icon={Key}>
           <div className="space-y-3 text-xs">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-[4px] p-2 mb-3">
+              <p className="text-emerald-700">
+                <strong>✨ AI keys are NOT required!</strong> Content generation is included with your subscription.
+              </p>
+            </div>
             <p className="text-muted-foreground">
-              For each website, configure the following in the API Keys page:
+              You only need to provide your target database credentials:
             </p>
             <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
               <li>
-                <strong>OpenAI API Key</strong> - For article generation (get from{" "}
-                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                  platform.openai.com
-                </a>)
+                <strong>Target Supabase URL</strong> - Your website&apos;s Supabase project URL (from Settings → API)
               </li>
               <li>
-                <strong>Anthropic API Key</strong> - Optional, for Claude-based generation (get from{" "}
-                <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                  console.anthropic.com
-                </a>)
-              </li>
-              <li>
-                <strong>Target Supabase URL</strong> - Your website&apos;s Supabase project URL
-              </li>
-              <li>
-                <strong>Target Service Role Key</strong> - From your Supabase project settings → API
+                <strong>Target Service Role Key</strong> - From your Supabase project Settings → API → service_role key
               </li>
             </ul>
 
             <div className="mt-3 pt-3 border-t">
-              <p className="font-medium text-foreground mb-1.5">Google Search API (Optional)</p>
+              <p className="font-medium text-foreground mb-1.5">Optional: Bring Your Own AI Keys</p>
               <p className="text-muted-foreground mb-1.5">
-                To discover trending topics via Google Search, configure these global keys:
+                If you want to use your own OpenAI/Anthropic quota instead of platform credits:
               </p>
               <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                 <li>
-                  <strong>Google Custom Search API Key</strong> - From{" "}
-                  <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                    Google Cloud Console
+                  <strong>OpenAI API Key</strong> - From{" "}
+                  <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                    platform.openai.com
                   </a>
                 </li>
                 <li>
-                  <strong>Google Search Engine ID (CX)</strong> - From{" "}
-                  <a href="https://programmablesearchengine.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                    Programmable Search Engine
+                  <strong>Anthropic API Key</strong> - From{" "}
+                  <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                    console.anthropic.com
                   </a>
                 </li>
               </ul>
-              <p className="text-[10px] text-muted-foreground mt-1.5">
-                Store via API: POST /api/system-keys with key_name: &quot;google_search_api_key&quot; and &quot;google_search_cx_id&quot;
-              </p>
             </div>
           </div>
         </CollapsibleSection>
