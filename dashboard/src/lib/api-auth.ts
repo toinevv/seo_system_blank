@@ -84,13 +84,12 @@ export async function validatePlatformApiKey(apiKey: string): Promise<{
   }
 
   // Update last used timestamp (fire and forget)
+  const currentCount = (keyRecord as unknown as { use_count?: number }).use_count ?? 0;
   supabase
     .from("platform_api_keys")
     .update({
       last_used_at: new Date().toISOString(),
-      use_count: (keyRecord as { use_count?: number }).use_count
-        ? (keyRecord as { use_count: number }).use_count + 1
-        : 1,
+      use_count: currentCount + 1,
     })
     .eq("id", keyRecord.id)
     .then(() => {});

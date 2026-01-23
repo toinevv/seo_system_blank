@@ -124,7 +124,7 @@ export default function NewWebsitePage() {
       case "database":
         return formData.target_supabase_url && formData.target_supabase_service_key;
       case "api-keys":
-        return formData.openai_api_key || formData.anthropic_api_key;
+        return true; // AI keys are optional - platform provides them
       default:
         return true;
     }
@@ -282,28 +282,28 @@ export default function NewWebsitePage() {
 
             {step === "api-keys" && (
               <>
-                <div className="rounded-md bg-muted p-4 mb-4">
-                  <p className="text-sm">
-                    Enter your AI API keys. You need at least one (OpenAI or Anthropic).
-                    The system alternates between them for content generation.
+                <div className="rounded-md bg-emerald-50 border border-emerald-200 p-4 mb-4">
+                  <p className="text-sm text-emerald-800">
+                    <strong>✨ AI keys are optional!</strong> Your subscription includes AI content
+                    generation powered by Claude. Skip this step or add your own keys to use your quota.
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="openai_api_key">OpenAI API Key</Label>
+                  <Label htmlFor="openai_api_key">OpenAI API Key <span className="text-muted-foreground">(optional)</span></Label>
                   <Input
                     id="openai_api_key"
                     type="password"
-                    placeholder="sk-proj-..."
+                    placeholder="sk-proj-... (leave blank to use platform AI)"
                     value={formData.openai_api_key}
                     onChange={(e) => updateField("openai_api_key", e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="anthropic_api_key">Anthropic API Key</Label>
+                  <Label htmlFor="anthropic_api_key">Anthropic API Key <span className="text-muted-foreground">(optional)</span></Label>
                   <Input
                     id="anthropic_api_key"
                     type="password"
-                    placeholder="sk-ant-..."
+                    placeholder="sk-ant-... (leave blank to use platform AI)"
                     value={formData.anthropic_api_key}
                     onChange={(e) => updateField("anthropic_api_key", e.target.value)}
                   />
@@ -335,14 +335,14 @@ export default function NewWebsitePage() {
                     <p className="font-medium">{formData.target_supabase_url ? "✓ Configured" : "Not set"}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">AI APIs</p>
+                    <p className="text-sm text-muted-foreground">AI Content Generation</p>
                     <p className="font-medium">
-                      {[
-                        formData.openai_api_key && "OpenAI",
-                        formData.anthropic_api_key && "Anthropic",
-                      ]
-                        .filter(Boolean)
-                        .join(", ") || "None"}
+                      {formData.openai_api_key || formData.anthropic_api_key
+                        ? [
+                            formData.openai_api_key && "OpenAI",
+                            formData.anthropic_api_key && "Anthropic",
+                          ].filter(Boolean).join(", ")
+                        : "✨ Platform AI (included)"}
                     </p>
                   </div>
                 </div>

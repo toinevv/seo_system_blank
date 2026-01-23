@@ -202,11 +202,20 @@ class Default(WorkerEntrypoint):
         anthropic_key = await self._decrypt(anthropic_key_encrypted, encryption_key) if anthropic_key_encrypted else None
         target_key = await self._decrypt(target_key_encrypted, encryption_key) if target_key_encrypted else None
 
-        console.log(f"Decryption results - OpenAI: {openai_key is not None}, Anthropic: {anthropic_key is not None}, Target: {target_key is not None}")
+        console.log(f"Per-website keys - OpenAI: {openai_key is not None}, Anthropic: {anthropic_key is not None}, Target: {target_key is not None}")
 
+        # Fallback to platform keys if no per-website AI keys
         if not openai_key and not anthropic_key:
-            console.log("No AI API keys configured or decryption failed")
-            return False
+            platform_openai = getattr(self.env, "PLATFORM_OPENAI_KEY", None)
+            platform_anthropic = getattr(self.env, "PLATFORM_ANTHROPIC_KEY", None)
+
+            if platform_openai or platform_anthropic:
+                openai_key = platform_openai
+                anthropic_key = platform_anthropic
+                console.log(f"Using platform keys - OpenAI: {openai_key is not None}, Anthropic: {anthropic_key is not None}")
+            else:
+                console.log("No AI API keys (per-website or platform)")
+                return False
 
         if not target_key:
             console.log("Target Supabase key decryption failed")
