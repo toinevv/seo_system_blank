@@ -32,3 +32,9 @@ NEXT_PUBLIC_GA_ID = "G-XXXXXXXXXX"
 #   npx wrangler secret put NEXT_PUBLIC_SUPABASE_ANON_KEY
 #   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 #   npx wrangler secret put ENCRYPTION_KEY
+#   npx wrangler secret put STRIPE_SECRET_KEY
+#   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+#   npx wrangler secret put STRIPE_PRICE_PRO_BASE
+#   npx wrangler secret put STRIPE_PRICE_PRO_GEO
+#   npx wrangler secret put STRIPE_PRICE_BUSINESS_BASE
+#   npx wrangler secret put STRIPE_PRICE_BUSINESS_GEO

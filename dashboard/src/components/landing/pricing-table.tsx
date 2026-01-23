@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Sparkles } from "lucide-react";
+import { Check, Sparkles, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 const plans = [
@@ -27,8 +28,8 @@ const plans = [
   },
   {
     name: "Pro",
-    basePrice: 37.5,
-    geoPrice: 75,
+    basePrice: 75,
+    geoPrice: 140,
     period: "/month",
     description: "For growing businesses",
     articles: 10,
@@ -47,13 +48,11 @@ const plans = [
     href: "/signup?plan=pro",
     highlighted: true,
     hasGeoOption: true,
-    priceIdBase: "price_pro_base", // Replace with actual Stripe Price ID
-    priceIdGeo: "price_pro_geo", // Replace with actual Stripe Price ID
   },
   {
     name: "Business",
     basePrice: 150,
-    geoPrice: 300,
+    geoPrice: 290,
     period: "/month",
     description: "For agencies and power users",
     articles: 30,
@@ -72,14 +71,14 @@ const plans = [
     href: "/signup?plan=business",
     highlighted: false,
     hasGeoOption: true,
-    priceIdBase: "price_business_base", // Replace with actual Stripe Price ID
-    priceIdGeo: "price_business_geo", // Replace with actual Stripe Price ID
   },
 ];
 
 export function PricingTable() {
   const [geoEnabled, setGeoEnabled] = useState(true);
   const [showWarning, setShowWarning] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleGeoToggle = () => {
     if (geoEnabled) {
@@ -97,6 +96,49 @@ export function PricingTable() {
   const formatPrice = (price: number) => {
     if (price === 0) return "€0";
     return `€${price % 1 === 0 ? price : price.toFixed(2)}`;
+  };
+
+  const handleCheckout = async (planName: string) => {
+    const plan = planName.toLowerCase() as "pro" | "business";
+    setLoadingPlan(planName);
+
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan, withGeo: geoEnabled }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.redirectToPortal) {
+          // User has subscription, redirect to portal
+          const portalResponse = await fetch("/api/stripe/portal", {
+            method: "POST",
+          });
+          const portalData = await portalResponse.json();
+          if (portalData.url) {
+            window.location.href = portalData.url;
+            return;
+          }
+        }
+        // Not logged in, redirect to signup with plan info
+        router.push(`/signup?plan=${plan}&geo=${geoEnabled}`);
+        return;
+      }
+
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error("Checkout error:", error);
+      // Fallback to signup
+      router.push(`/signup?plan=${plan}&geo=${geoEnabled}`);
+    } finally {
+      setLoadingPlan(null);
+    }
   };
 
   return (
@@ -233,11 +275,7 @@ export function PricingTable() {
                           : "text-landing-text-muted"
                       }`}
                     >
-                      <Check size={12} className={`shrink-0 ${
-                        plan.geoFeatures?.includes(feature)
-                          ? "text-landing-accent"
-                          : "text-landing-accent"
-                      }`} />
+                      <Check size={12} className="shrink-0 text-landing-accent" />
                       {feature}
                       {plan.geoFeatures?.includes(feature) && (
                         <Sparkles size={10} className="text-landing-accent" />
@@ -246,18 +284,34 @@ export function PricingTable() {
                   ))}
                 </ul>
 
-                <Link
-                  href={`${plan.href}${plan.hasGeoOption ? `&geo=${geoEnabled}` : ''}`}
-                  className="block"
-                >
+                {plan.hasGeoOption ? (
                   <Button
                     variant={plan.highlighted ? "landing" : "landing-outline"}
                     size="sm"
                     className="w-full"
+                    onClick={() => handleCheckout(plan.name)}
+                    disabled={loadingPlan !== null}
                   >
-                    {plan.cta}
+                    {loadingPlan === plan.name ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin mr-2" />
+                        Loading...
+                      </>
+                    ) : (
+                      plan.cta
+                    )}
                   </Button>
-                </Link>
+                ) : (
+                  <Link href={plan.href} className="block">
+                    <Button
+                      variant={plan.highlighted ? "landing" : "landing-outline"}
+                      size="sm"
+                      className="w-full"
+                    >
+                      {plan.cta}
+                    </Button>
+                  </Link>
+                )}
               </div>
             );
           })}
