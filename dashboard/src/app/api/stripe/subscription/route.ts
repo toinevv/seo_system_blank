@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { getActiveSubscription, PLANS } from "@/lib/stripe";
+import { getActiveSubscription } from "@/lib/stripe";
 
 export async function GET() {
   try {
@@ -21,11 +21,12 @@ export async function GET() {
       .single();
 
     if (!profile?.stripe_customer_id) {
-      // No customer ID = free plan
+      // No customer ID = no subscription
       return NextResponse.json({
-        plan: PLANS.free,
-        planKey: "free",
+        plan: null,
+        planKey: null,
         subscription: null,
+        hasSubscription: false,
       });
     }
 
@@ -34,9 +35,10 @@ export async function GET() {
 
     if (!subscription) {
       return NextResponse.json({
-        plan: PLANS.free,
-        planKey: "free",
+        plan: null,
+        planKey: null,
         subscription: null,
+        hasSubscription: false,
       });
     }
 
@@ -49,6 +51,7 @@ export async function GET() {
         currentPeriodEnd: subscription.currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
       },
+      hasSubscription: true,
     });
   } catch (error) {
     console.error("Subscription status error:", error);

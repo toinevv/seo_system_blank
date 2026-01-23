@@ -1,33 +1,38 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Sparkles, Loader2 } from "lucide-react";
-import Link from "next/link";
+import { Check, Sparkles, Loader2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 const plans = [
   {
-    name: "Free",
-    basePrice: 0,
-    geoPrice: 0,
-    period: "forever",
-    description: "Perfect for testing with a single project",
+    name: "Starter",
+    planKey: "starter",
+    basePrice: 30,
+    geoPrice: 60,
+    period: "/month",
+    description: "Perfect for testing",
     articles: 3,
     features: [
       "1 website",
       "3 articles/month",
       "Basic topic suggestions",
       "Google indexing",
-      "Community support",
+      "Email support",
     ],
-    cta: "Start Free",
-    href: "/signup",
+    geoFeatures: [
+      "GEO optimization",
+      "AI chat visibility",
+    ],
+    note: "3 articles/month is great for testing. Note: ranking high on Google typically takes 12+ months of consistent content.",
+    cta: "Get Started",
     highlighted: false,
-    hasGeoOption: false,
+    hasGeoOption: true,
   },
   {
     name: "Pro",
+    planKey: "pro",
     basePrice: 75,
     geoPrice: 140,
     period: "/month",
@@ -45,12 +50,12 @@ const plans = [
       "AI chat visibility",
     ],
     cta: "Get Started",
-    href: "/signup?plan=pro",
     highlighted: true,
     hasGeoOption: true,
   },
   {
     name: "Business",
+    planKey: "business",
     basePrice: 150,
     geoPrice: 290,
     period: "/month",
@@ -68,7 +73,6 @@ const plans = [
       "AI chat visibility",
     ],
     cta: "Get Started",
-    href: "/signup?plan=business",
     highlighted: false,
     hasGeoOption: true,
   },
@@ -94,24 +98,27 @@ export function PricingTable() {
   };
 
   const formatPrice = (price: number) => {
-    if (price === 0) return "€0";
     return `€${price % 1 === 0 ? price : price.toFixed(2)}`;
   };
 
-  const handleCheckout = async (planName: string) => {
-    const plan = planName.toLowerCase() as "pro" | "business";
-    setLoadingPlan(planName);
+  const handleCheckout = async (planKey: string) => {
+    setLoadingPlan(planKey);
 
     try {
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, withGeo: geoEnabled }),
+        body: JSON.stringify({ plan: planKey, withGeo: geoEnabled }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.error === "Unauthorized" || response.status === 401) {
+          // Not logged in, redirect to signup with plan info
+          router.push(`/signup?plan=${planKey}&geo=${geoEnabled}`);
+          return;
+        }
         if (data.redirectToPortal) {
           // User has subscription, redirect to portal
           const portalResponse = await fetch("/api/stripe/portal", {
@@ -123,8 +130,8 @@ export function PricingTable() {
             return;
           }
         }
-        // Not logged in, redirect to signup with plan info
-        router.push(`/signup?plan=${plan}&geo=${geoEnabled}`);
+        // Other error, redirect to signup
+        router.push(`/signup?plan=${planKey}&geo=${geoEnabled}`);
         return;
       }
 
@@ -135,7 +142,7 @@ export function PricingTable() {
     } catch (error) {
       console.error("Checkout error:", error);
       // Fallback to signup
-      router.push(`/signup?plan=${plan}&geo=${geoEnabled}`);
+      router.push(`/signup?plan=${planKey}&geo=${geoEnabled}`);
     } finally {
       setLoadingPlan(null);
     }
@@ -155,7 +162,7 @@ export function PricingTable() {
         </h2>
 
         <p className="text-sm text-landing-text-muted text-center max-w-xl mx-auto mb-6">
-          Start free, scale as you grow. No hidden fees.
+          Start small, scale as you grow. No hidden fees.
         </p>
 
         {/* GEO Toggle */}
@@ -284,34 +291,30 @@ export function PricingTable() {
                   ))}
                 </ul>
 
-                {plan.hasGeoOption ? (
-                  <Button
-                    variant={plan.highlighted ? "landing" : "landing-outline"}
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleCheckout(plan.name)}
-                    disabled={loadingPlan !== null}
-                  >
-                    {loadingPlan === plan.name ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin mr-2" />
-                        Loading...
-                      </>
-                    ) : (
-                      plan.cta
-                    )}
-                  </Button>
-                ) : (
-                  <Link href={plan.href} className="block">
-                    <Button
-                      variant={plan.highlighted ? "landing" : "landing-outline"}
-                      size="sm"
-                      className="w-full"
-                    >
-                      {plan.cta}
-                    </Button>
-                  </Link>
+                {/* Note for Starter plan */}
+                {plan.note && (
+                  <div className="flex items-start gap-2 mb-4 p-2 bg-landing-bg rounded text-[10px] text-landing-text-muted">
+                    <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                    <span>{plan.note}</span>
+                  </div>
                 )}
+
+                <Button
+                  variant={plan.highlighted ? "landing" : "landing-outline"}
+                  size="sm"
+                  className="w-full"
+                  onClick={() => handleCheckout(plan.planKey)}
+                  disabled={loadingPlan !== null}
+                >
+                  {loadingPlan === plan.planKey ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin mr-2" />
+                      Loading...
+                    </>
+                  ) : (
+                    plan.cta
+                  )}
+                </Button>
               </div>
             );
           })}
@@ -319,7 +322,7 @@ export function PricingTable() {
 
         {/* Footer note */}
         <p className="text-xs text-landing-text-muted text-center mt-6">
-          All plans include SSL, automatic backups, and 99.9% uptime guarantee.
+          All plans include SSL, automatic backups, and 99.9% uptime guarantee. Cancel anytime.
         </p>
       </div>
     </section>

@@ -18,13 +18,13 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { plan, withGeo } = body as {
-      plan: "pro" | "business";
+      plan: "starter" | "pro" | "business";
       withGeo: boolean;
     };
 
-    if (!plan || !["pro", "business"].includes(plan)) {
+    if (!plan || !["starter", "pro", "business"].includes(plan)) {
       return NextResponse.json(
-        { error: "Invalid plan. Must be 'pro' or 'business'" },
+        { error: "Invalid plan. Must be 'starter', 'pro', or 'business'" },
         { status: 400 }
       );
     }

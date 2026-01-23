@@ -34,6 +34,8 @@ NEXT_PUBLIC_GA_ID = "G-XXXXXXXXXX"
 #   npx wrangler secret put ENCRYPTION_KEY
 #   npx wrangler secret put STRIPE_SECRET_KEY
 #   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+#   npx wrangler secret put STRIPE_PRICE_STARTER_BASE
+#   npx wrangler secret put STRIPE_PRICE_STARTER_GEO
 #   npx wrangler secret put STRIPE_PRICE_PRO_BASE
 #   npx wrangler secret put STRIPE_PRICE_PRO_GEO
 #   npx wrangler secret put STRIPE_PRICE_BUSINESS_BASE

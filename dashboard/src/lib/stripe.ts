@@ -24,8 +24,12 @@ export const stripe = {
   get billingPortal() { return getStripe().billingPortal; },
 } as unknown as Stripe;
 
-// Price IDs - Replace with your actual Stripe Price IDs
+// Price IDs - Set via environment variables
 export const PRICE_IDS = {
+  starter: {
+    base: process.env.STRIPE_PRICE_STARTER_BASE || "price_starter_base",
+    geo: process.env.STRIPE_PRICE_STARTER_GEO || "price_starter_geo",
+  },
   pro: {
     base: process.env.STRIPE_PRICE_PRO_BASE || "price_pro_base",
     geo: process.env.STRIPE_PRICE_PRO_GEO || "price_pro_geo",
@@ -38,11 +42,17 @@ export const PRICE_IDS = {
 
 // Plan metadata
 export const PLANS = {
-  free: {
-    name: "Free",
+  starter_base: {
+    name: "Starter",
     articlesPerMonth: 3,
     maxWebsites: 1,
     hasGeo: false,
+  },
+  starter_geo: {
+    name: "Starter + GEO",
+    articlesPerMonth: 3,
+    maxWebsites: 1,
+    hasGeo: true,
   },
   pro_base: {
     name: "Pro",
@@ -75,18 +85,20 @@ export type PlanKey = keyof typeof PLANS;
 /**
  * Get plan details from a Stripe Price ID
  */
-export function getPlanFromPriceId(priceId: string): PlanKey {
+export function getPlanFromPriceId(priceId: string): PlanKey | null {
+  if (priceId === PRICE_IDS.starter.base) return "starter_base";
+  if (priceId === PRICE_IDS.starter.geo) return "starter_geo";
   if (priceId === PRICE_IDS.pro.base) return "pro_base";
   if (priceId === PRICE_IDS.pro.geo) return "pro_geo";
   if (priceId === PRICE_IDS.business.base) return "business_base";
   if (priceId === PRICE_IDS.business.geo) return "business_geo";
-  return "free";
+  return null;
 }
 
 /**
  * Get the correct price ID based on plan and GEO selection
  */
-export function getPriceId(plan: "pro" | "business", withGeo: boolean): string {
+export function getPriceId(plan: "starter" | "pro" | "business", withGeo: boolean): string {
   return withGeo ? PRICE_IDS[plan].geo : PRICE_IDS[plan].base;
 }
 
@@ -107,7 +119,7 @@ export async function getActiveSubscription(customerId: string) {
   const subscription = subscriptions.data[0];
   const priceId = subscription.items.data[0]?.price.id;
   const planKey = getPlanFromPriceId(priceId || "");
-  const plan = PLANS[planKey];
+  const plan = planKey ? PLANS[planKey] : null;
 
   return {
     id: subscription.id,
@@ -122,15 +134,16 @@ export async function getActiveSubscription(customerId: string) {
 
 /**
  * Get user's current plan (checks Stripe if they have a customer ID)
+ * Returns null if no active subscription
  */
 export async function getUserPlan(stripeCustomerId: string | null) {
   if (!stripeCustomerId) {
-    return PLANS.free;
+    return null;
   }
 
   const subscription = await getActiveSubscription(stripeCustomerId);
-  if (!subscription) {
-    return PLANS.free;
+  if (!subscription || !subscription.plan) {
+    return null;
   }
 
   return subscription.plan;

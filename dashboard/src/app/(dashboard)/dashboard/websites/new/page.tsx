@@ -8,10 +8,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Copy, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
-type Step = "basic" | "database" | "api-keys" | "review";
+// Common languages for SEO content
+const LANGUAGES = [
+  { value: "en-US", label: "English (US)" },
+  { value: "en-GB", label: "English (UK)" },
+  { value: "nl-NL", label: "Dutch (Netherlands)" },
+  { value: "nl-BE", label: "Dutch (Belgium)" },
+  { value: "de-DE", label: "German" },
+  { value: "fr-FR", label: "French" },
+  { value: "es-ES", label: "Spanish" },
+  { value: "it-IT", label: "Italian" },
+  { value: "pt-BR", label: "Portuguese (Brazil)" },
+  { value: "pt-PT", label: "Portuguese (Portugal)" },
+  { value: "pl-PL", label: "Polish" },
+  { value: "sv-SE", label: "Swedish" },
+  { value: "da-DK", label: "Danish" },
+  { value: "no-NO", label: "Norwegian" },
+  { value: "fi-FI", label: "Finnish" },
+];
+
+// Extract project ID from Supabase URL (e.g., "klhmxzuvfzodmcotsezy" from "https://klhmxzuvfzodmcotsezy.supabase.co")
+const extractSupabaseProjectId = (url: string): string | null => {
+  const match = url.match(/https?:\/\/([a-z0-9]+)\.supabase\.co/i);
+  return match ? match[1] : null;
+};
+
+type Step = "basic" | "database" | "sql-setup" | "review";
 
 export default function NewWebsitePage() {
   const router = useRouter();
@@ -19,6 +44,7 @@ export default function NewWebsitePage() {
   const [step, setStep] = useState<Step>("basic");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sqlCopied, setSqlCopied] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -33,10 +59,6 @@ export default function NewWebsitePage() {
     // Target database
     target_supabase_url: "",
     target_supabase_service_key: "",
-
-    // API keys
-    openai_api_key: "",
-    anthropic_api_key: "",
   });
 
   const updateField = (field: string, value: string | number) => {
@@ -64,13 +86,20 @@ export default function NewWebsitePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Clean domain (remove protocol, www, trailing slash)
+      const cleanDomain = formData.domain
+        .replace(/^https?:\/\//, "")
+        .replace(/^www\./, "")
+        .replace(/\/$/, "")
+        .toLowerCase();
+
       // Create website
       const { data: website, error: websiteError } = await supabase
         .from("websites")
         .insert({
           user_id: user.id,
           name: formData.name,
-          domain: formData.domain,
+          domain: cleanDomain,
           product_id: formData.product_id,
           language: formData.language,
           default_author: formData.default_author,
@@ -81,16 +110,25 @@ export default function NewWebsitePage() {
         .select()
         .single();
 
-      if (websiteError) throw websiteError;
+      if (websiteError) {
+        // Check for unique constraint violation (PostgreSQL error code 23505)
+        if (websiteError.code === "23505") {
+          if (websiteError.message?.includes("domain")) {
+            throw new Error("A website with this domain already exists. Please use a different domain.");
+          } else if (websiteError.message?.includes("product_id")) {
+            throw new Error("A website with this Product ID already exists. Please change the Product ID.");
+          }
+          throw new Error("This website already exists. Please check the domain and Product ID are unique.");
+        }
+        throw websiteError;
+      }
 
-      // Store API keys (encryption happens server-side)
+      // Store database credentials (encryption happens server-side)
       const response = await fetch("/api/api-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           website_id: website.id,
-          openai_api_key: formData.openai_api_key,
-          anthropic_api_key: formData.anthropic_api_key,
           target_supabase_url: formData.target_supabase_url,
           target_supabase_service_key: formData.target_supabase_service_key,
         }),
@@ -112,7 +150,7 @@ export default function NewWebsitePage() {
   const steps: { key: Step; title: string; description: string }[] = [
     { key: "basic", title: "Basic Info", description: "Website name and settings" },
     { key: "database", title: "Target Database", description: "Where to store articles" },
-    { key: "api-keys", title: "API Keys", description: "AI service credentials" },
+    { key: "sql-setup", title: "Database Setup", description: "Create the articles table" },
     { key: "review", title: "Review", description: "Confirm and create" },
   ];
 
@@ -123,11 +161,107 @@ export default function NewWebsitePage() {
         return formData.name && formData.domain && formData.product_id;
       case "database":
         return formData.target_supabase_url && formData.target_supabase_service_key;
-      case "api-keys":
-        return true; // AI keys are optional - platform provides them
+      case "sql-setup":
+        return true; // SQL setup is informational, they can proceed
       default:
         return true;
     }
+  };
+
+  // Get the Supabase project ID for the SQL editor link
+  const supabaseProjectId = extractSupabaseProjectId(formData.target_supabase_url);
+  const sqlEditorUrl = supabaseProjectId
+    ? `https://supabase.com/dashboard/project/${supabaseProjectId}/sql/new`
+    : null;
+
+  // The SQL schema to copy
+  const databaseSql = `-- Run this SQL in your Supabase SQL Editor to create the blog_articles table
+
+CREATE TABLE IF NOT EXISTS public.blog_articles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    website_domain TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    excerpt TEXT,
+    meta_description TEXT,
+    cover_image_url TEXT,
+    cover_image_alt TEXT,
+    tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+    primary_keyword TEXT,
+    secondary_keywords TEXT[] DEFAULT ARRAY[]::TEXT[],
+    internal_links JSONB DEFAULT '[]'::JSONB,
+    schema_markup JSONB DEFAULT '{}'::JSONB,
+    keyword_analysis JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    status TEXT DEFAULT 'published' CHECK (status IN ('draft', 'published', 'archived', 'deleted')),
+    author TEXT,
+    read_time INTEGER DEFAULT 5,
+    category TEXT,
+    topic_id TEXT,
+    seo_score INTEGER,
+    geo_targeting TEXT[],
+    language TEXT,
+    tldr TEXT,
+    faq_items JSONB DEFAULT '[]'::JSONB,
+    cited_statistics JSONB DEFAULT '[]'::JSONB,
+    citations JSONB DEFAULT '[]'::JSONB,
+    geo_optimized BOOLEAN DEFAULT FALSE,
+    faq_schema JSONB DEFAULT '{}'::JSONB,
+    CONSTRAINT blog_articles_slug_product_unique UNIQUE(slug, product_id)
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_blog_product ON public.blog_articles(product_id, status, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_blog_product_category ON public.blog_articles(product_id, category);
+CREATE INDEX IF NOT EXISTS idx_blog_published ON public.blog_articles(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_blog_category ON public.blog_articles(category);
+CREATE INDEX IF NOT EXISTS idx_blog_status ON public.blog_articles(status);
+CREATE INDEX IF NOT EXISTS idx_blog_tags ON public.blog_articles USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_blog_slug ON public.blog_articles(slug);
+
+-- Create updated_at trigger
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+DROP TRIGGER IF EXISTS update_blog_articles_updated_at ON public.blog_articles;
+CREATE TRIGGER update_blog_articles_updated_at
+    BEFORE UPDATE ON public.blog_articles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.blog_articles ENABLE ROW LEVEL SECURITY;
+
+-- Create policy for public read access (published articles only)
+CREATE POLICY "Public can read published articles"
+    ON public.blog_articles
+    FOR SELECT
+    USING (status = 'published');
+
+-- Create policy for service role to manage articles
+CREATE POLICY "Service role can manage articles"
+    ON public.blog_articles
+    FOR ALL
+    USING (true)
+    WITH CHECK (true);
+
+-- Grant permissions
+GRANT SELECT ON public.blog_articles TO anon;
+GRANT ALL ON public.blog_articles TO authenticated;
+GRANT ALL ON public.blog_articles TO service_role;`;
+
+  const copyToClipboard = async () => {
+    await navigator.clipboard.writeText(databaseSql);
+    setSqlCopied(true);
+    setTimeout(() => setSqlCopied(false), 2000);
   };
 
   return (
@@ -216,12 +350,18 @@ export default function NewWebsitePage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="language">Language</Label>
-                    <Input
+                    <select
                       id="language"
-                      placeholder="en-US"
                       value={formData.language}
                       onChange={(e) => updateField("language", e.target.value)}
-                    />
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang.value} value={lang.value}>
+                          {lang.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="days_between_posts">Days Between Posts</Label>
@@ -280,33 +420,56 @@ export default function NewWebsitePage() {
               </>
             )}
 
-            {step === "api-keys" && (
+            {step === "sql-setup" && (
               <>
-                <div className="rounded-md bg-emerald-50 border border-emerald-200 p-4 mb-4">
-                  <p className="text-sm text-emerald-800">
-                    <strong>✨ AI keys are optional!</strong> Your subscription includes AI content
-                    generation powered by Claude. Skip this step or add your own keys to use your quota.
+                <div className="rounded-md bg-blue-50 border border-blue-200 p-4 mb-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>📋 One-time setup:</strong> Copy the SQL below and run it in your Supabase SQL Editor
+                    to create the <code className="bg-blue-100 px-1 rounded">blog_articles</code> table.
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="openai_api_key">OpenAI API Key <span className="text-muted-foreground">(optional)</span></Label>
-                  <Input
-                    id="openai_api_key"
-                    type="password"
-                    placeholder="sk-proj-... (leave blank to use platform AI)"
-                    value={formData.openai_api_key}
-                    onChange={(e) => updateField("openai_api_key", e.target.value)}
-                  />
+
+                <div className="flex gap-2 mb-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={copyToClipboard}
+                    className="flex items-center gap-2"
+                  >
+                    {sqlCopied ? (
+                      <>
+                        <Check className="h-4 w-4 text-green-600" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" />
+                        Copy SQL
+                      </>
+                    )}
+                  </Button>
+
+                  {sqlEditorUrl && (
+                    <a href={sqlEditorUrl} target="_blank" rel="noopener noreferrer">
+                      <Button type="button" variant="default" className="flex items-center gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                        Open SQL Editor
+                      </Button>
+                    </a>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="anthropic_api_key">Anthropic API Key <span className="text-muted-foreground">(optional)</span></Label>
-                  <Input
-                    id="anthropic_api_key"
-                    type="password"
-                    placeholder="sk-ant-... (leave blank to use platform AI)"
-                    value={formData.anthropic_api_key}
-                    onChange={(e) => updateField("anthropic_api_key", e.target.value)}
-                  />
+
+                <div className="relative">
+                  <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-80 overflow-y-auto">
+                    <code>{databaseSql}</code>
+                  </pre>
+                </div>
+
+                <div className="rounded-md bg-amber-50 border border-amber-200 p-4 mt-4">
+                  <p className="text-sm text-amber-800">
+                    <strong>💡 Tip:</strong> Click &quot;Open SQL Editor&quot; to go directly to your project&apos;s
+                    SQL editor, paste the SQL, and click &quot;Run&quot;. The table will be created automatically.
+                  </p>
                 </div>
               </>
             )}
@@ -327,6 +490,12 @@ export default function NewWebsitePage() {
                     <p className="font-medium">{formData.product_id}</p>
                   </div>
                   <div>
+                    <p className="text-sm text-muted-foreground">Language</p>
+                    <p className="font-medium">
+                      {LANGUAGES.find((l) => l.value === formData.language)?.label || formData.language}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-sm text-muted-foreground">Posting Frequency</p>
                     <p className="font-medium">Every {formData.days_between_posts} days</p>
                   </div>
@@ -334,18 +503,21 @@ export default function NewWebsitePage() {
                     <p className="text-sm text-muted-foreground">Target Database</p>
                     <p className="font-medium">{formData.target_supabase_url ? "✓ Configured" : "Not set"}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">AI Content Generation</p>
-                    <p className="font-medium">
-                      {formData.openai_api_key || formData.anthropic_api_key
-                        ? [
-                            formData.openai_api_key && "OpenAI",
-                            formData.anthropic_api_key && "Anthropic",
-                          ].filter(Boolean).join(", ")
-                        : "✨ Platform AI (included)"}
-                    </p>
-                  </div>
                 </div>
+
+                {sqlEditorUrl && (
+                  <div className="pt-4 border-t">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Make sure you&apos;ve run the SQL in your Supabase project:
+                    </p>
+                    <a href={sqlEditorUrl} target="_blank" rel="noopener noreferrer">
+                      <Button type="button" variant="outline" size="sm" className="flex items-center gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                        Open SQL Editor
+                      </Button>
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
