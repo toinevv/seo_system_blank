@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Check, Sparkles, Loader2, AlertCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 const plans = [
@@ -10,7 +9,7 @@ const plans = [
     name: "Starter",
     planKey: "starter",
     basePrice: 30,
-    geoPrice: 60,
+    geoPrice: 35,
     period: "/month",
     description: "Perfect for testing",
     articles: 3,
@@ -82,7 +81,6 @@ export function PricingTable() {
   const [geoEnabled, setGeoEnabled] = useState(true);
   const [showWarning, setShowWarning] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-  const router = useRouter();
 
   const handleGeoToggle = () => {
     if (geoEnabled) {
@@ -114,13 +112,8 @@ export function PricingTable() {
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.error === "Unauthorized" || response.status === 401) {
-          // Not logged in, redirect to signup with plan info
-          router.push(`/signup?plan=${planKey}&geo=${geoEnabled}`);
-          return;
-        }
         if (data.redirectToPortal) {
-          // User has subscription, redirect to portal
+          // User already has subscription, redirect to portal
           const portalResponse = await fetch("/api/stripe/portal", {
             method: "POST",
           });
@@ -130,19 +123,19 @@ export function PricingTable() {
             return;
           }
         }
-        // Other error, redirect to signup
-        router.push(`/signup?plan=${planKey}&geo=${geoEnabled}`);
+        // Show error
+        console.error("Checkout error:", data.error);
+        alert(data.error || "Failed to start checkout. Please try again.");
         return;
       }
 
-      // Redirect to Stripe Checkout
+      // Redirect to Stripe Checkout (works for both guests and logged-in users)
       if (data.url) {
         window.location.href = data.url;
       }
     } catch (error) {
       console.error("Checkout error:", error);
-      // Fallback to signup
-      router.push(`/signup?plan=${planKey}&geo=${geoEnabled}`);
+      alert("Failed to start checkout. Please try again.");
     } finally {
       setLoadingPlan(null);
     }
