@@ -1,17 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Search, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Search, Loader2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 
 interface ScanWebsiteButtonProps {
   websiteId: string;
+  hasScan?: boolean;
 }
 
-export function ScanWebsiteButton({ websiteId }: ScanWebsiteButtonProps) {
+export function ScanWebsiteButton({ websiteId, hasScan: initialHasScan }: ScanWebsiteButtonProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [hasScan, setHasScan] = useState(initialHasScan ?? false);
+
+  // Check if scan exists on mount (if not provided via prop)
+  useEffect(() => {
+    if (initialHasScan !== undefined) return;
+
+    const checkScanStatus = async () => {
+      try {
+        const response = await fetch(`/api/v1/websites/${websiteId}/scan`);
+        if (response.ok) {
+          const data = await response.json();
+          setHasScan(data.data?.has_scan ?? false);
+        }
+      } catch {
+        // Ignore errors - default to false
+      }
+    };
+
+    checkScanStatus();
+  }, [websiteId, initialHasScan]);
 
   const handleScan = async () => {
     setIsScanning(true);
@@ -30,6 +51,7 @@ export function ScanWebsiteButton({ websiteId }: ScanWebsiteButtonProps) {
 
       if (response.ok && !data.error) {
         setStatus("success");
+        setHasScan(true); // Mark that we now have a scan
         setMessage(data.message || "Scan completed successfully");
         // Reload the page to show updated scan data
         setTimeout(() => {
@@ -71,6 +93,11 @@ export function ScanWebsiteButton({ websiteId }: ScanWebsiteButtonProps) {
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             Scanning...
+          </>
+        ) : hasScan ? (
+          <>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh Scan
           </>
         ) : (
           <>

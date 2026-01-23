@@ -77,9 +77,22 @@ class Default(WorkerEntrypoint):
             console.log(f"Decryption error: {str(e)}")
             return None
 
+    def _parse_query_params(self, url: str) -> dict:
+        """Parse query parameters from URL."""
+        params = {}
+        if "?" in url:
+            query_string = url.split("?")[1]
+            for param in query_string.split("&"):
+                if "=" in param:
+                    key, value = param.split("=", 1)
+                    params[key] = value
+        return params
+
     async def on_fetch(self, request):
         """Handle HTTP requests (for manual triggers and health checks)."""
         url = request.url
+        params = self._parse_query_params(url)
+        website_id = params.get("website_id")
 
         try:
             if "/health" in url:
@@ -89,23 +102,35 @@ class Default(WorkerEntrypoint):
                     "timestamp": datetime.now().isoformat()
                 }), headers={"Content-Type": "application/json"})
 
-            if "/trigger" in url:
-                result = await self.run_generation()
+            if "/trigger" in url or "/generate" in url:
+                # Support single-website generation
+                if website_id:
+                    result = await self.generate_for_single_website(website_id)
+                else:
+                    result = await self.run_generation()
                 return Response(json.dumps(result), headers={"Content-Type": "application/json"})
 
-            if "/discover" in url:
-                # Topic discovery endpoint (now with website scanning context)
-                result = await self.discover_all_topics()
+            if "/discover-topics" in url or "/discover" in url:
+                # Support single-website discovery with custom count
+                if website_id:
+                    count = int(params.get("count", "10"))
+                    result = await self.discover_for_single_website(website_id, count)
+                else:
+                    result = await self.discover_all_topics()
                 return Response(json.dumps(result), headers={"Content-Type": "application/json"})
 
             if "/scan" in url:
-                # Website scanning endpoint - extracts content themes and keywords
-                result = await self.scan_all_websites()
+                # Support single-website scanning
+                if website_id:
+                    result = await self.scan_single_website(website_id)
+                else:
+                    result = await self.scan_all_websites()
                 return Response(json.dumps(result), headers={"Content-Type": "application/json"})
 
             return Response(json.dumps({
                 "message": "SEO Content Generator Worker",
-                "endpoints": ["/health", "/trigger", "/discover", "/scan"]
+                "endpoints": ["/health", "/trigger", "/generate", "/discover", "/scan"],
+                "single_website": "Add ?website_id=xxx to target a specific website"
             }), headers={"Content-Type": "application/json"})
 
         except Exception as e:
@@ -1186,6 +1211,186 @@ Output clean semantic HTML only - never wrap in code blocks or include document 
         except Exception as e:
             console.log(f"Scan error: {str(e)}")
             return {"error": str(e)}
+
+    async def scan_single_website(self, website_id: str) -> dict:
+        """Scan a single website by ID (for onboarding flow)."""
+        try:
+            supabase_url = getattr(self.env, "CENTRAL_SUPABASE_URL", None)
+            supabase_key = getattr(self.env, "CENTRAL_SUPABASE_SERVICE_KEY", None)
+            encryption_key = getattr(self.env, "ENCRYPTION_KEY", None)
+
+            if not all([supabase_url, supabase_key, encryption_key]):
+                return {"error": "Missing environment variables", "success": False}
+
+            # Fetch website by ID
+            url = f"{supabase_url}/rest/v1/websites?id=eq.{website_id}&select=*"
+            headers = {
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}"
+            }
+
+            response = await fetch(url, self._make_options("GET", headers))
+            if not response.ok:
+                return {"error": "Failed to fetch website", "success": False}
+
+            websites = list(await self._parse_json(response))
+            if not websites:
+                return {"error": "Website not found", "success": False}
+
+            website = dict(websites[0])
+            console.log(f"Single website scan: {website.get('name')}")
+
+            # Get API keys for AI analysis
+            api_keys = await self.get_api_keys(website_id, supabase_url, supabase_key)
+            openai_key = None
+            if api_keys and api_keys.get("openai_api_key_encrypted"):
+                openai_key = await self._decrypt(api_keys.get("openai_api_key_encrypted"), encryption_key)
+
+            # Fallback to platform key
+            if not openai_key:
+                openai_key = getattr(self.env, "PLATFORM_OPENAI_KEY", None)
+
+            success = await self.scan_website(website, openai_key, supabase_url, supabase_key)
+
+            if success:
+                # Get the scan data to return
+                scan_data = await self.get_website_scan(website_id, supabase_url, supabase_key)
+                return {
+                    "success": True,
+                    "website_id": website_id,
+                    "message": "Scan completed",
+                    "data": scan_data
+                }
+            else:
+                return {"success": False, "website_id": website_id, "error": "Scan failed"}
+
+        except Exception as e:
+            console.log(f"Single scan error: {str(e)}")
+            return {"error": str(e), "success": False}
+
+    async def discover_for_single_website(self, website_id: str, count: int = 10) -> dict:
+        """Discover topics for a single website (for onboarding flow)."""
+        try:
+            supabase_url = getattr(self.env, "CENTRAL_SUPABASE_URL", None)
+            supabase_key = getattr(self.env, "CENTRAL_SUPABASE_SERVICE_KEY", None)
+            encryption_key = getattr(self.env, "ENCRYPTION_KEY", None)
+
+            if not all([supabase_url, supabase_key, encryption_key]):
+                return {"error": "Missing environment variables", "success": False, "topics": []}
+
+            # Fetch website by ID
+            url = f"{supabase_url}/rest/v1/websites?id=eq.{website_id}&select=*"
+            headers = {
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}"
+            }
+
+            response = await fetch(url, self._make_options("GET", headers))
+            if not response.ok:
+                return {"error": "Failed to fetch website", "success": False, "topics": []}
+
+            websites = list(await self._parse_json(response))
+            if not websites:
+                return {"error": "Website not found", "success": False, "topics": []}
+
+            website = dict(websites[0])
+            console.log(f"Discovering {count} topics for: {website.get('name')}")
+
+            # Get API keys
+            api_keys = await self.get_api_keys(website_id, supabase_url, supabase_key)
+            openai_key = None
+            if api_keys and api_keys.get("openai_api_key_encrypted"):
+                openai_key = await self._decrypt(api_keys.get("openai_api_key_encrypted"), encryption_key)
+
+            # Fallback to platform key
+            if not openai_key:
+                openai_key = getattr(self.env, "PLATFORM_OPENAI_KEY", None)
+
+            if not openai_key:
+                return {"error": "No OpenAI API key available", "success": False, "topics": []}
+
+            # Ensure website is scanned first
+            existing_scan = await self.get_website_scan(website_id, supabase_url, supabase_key)
+            if not existing_scan or existing_scan.get("scan_status") != "completed":
+                console.log(f"Scanning {website.get('name')} before topic discovery...")
+                await self.scan_website(website, openai_key, supabase_url, supabase_key)
+
+            # Discover topics (call multiple times for larger counts)
+            all_topics = []
+            batches_needed = (count + 4) // 5  # Each call returns ~5 topics
+            max_batches = min(batches_needed, 10)  # Cap at 10 batches = 50 topics
+
+            for i in range(max_batches):
+                if len(all_topics) >= count:
+                    break
+
+                topics = await self.discover_topics_for_website(
+                    website, openai_key, supabase_url, supabase_key, encryption_key
+                )
+                if topics:
+                    # Filter duplicates
+                    existing_titles = {t.get("title", "").lower() for t in all_topics}
+                    new_topics = [t for t in topics if t.get("title", "").lower() not in existing_titles]
+                    all_topics.extend(new_topics)
+                    console.log(f"Batch {i+1}: discovered {len(new_topics)} new topics")
+
+            # Trim to requested count
+            all_topics = all_topics[:count]
+
+            return {
+                "success": True,
+                "website_id": website_id,
+                "topics": all_topics,
+                "count": len(all_topics),
+                "message": f"Discovered {len(all_topics)} topics"
+            }
+
+        except Exception as e:
+            console.log(f"Single discover error: {str(e)}")
+            return {"error": str(e), "success": False, "topics": []}
+
+    async def generate_for_single_website(self, website_id: str) -> dict:
+        """Generate content for a single website (for onboarding flow)."""
+        try:
+            supabase_url = getattr(self.env, "CENTRAL_SUPABASE_URL", None)
+            supabase_key = getattr(self.env, "CENTRAL_SUPABASE_SERVICE_KEY", None)
+            encryption_key = getattr(self.env, "ENCRYPTION_KEY", None)
+
+            if not all([supabase_url, supabase_key, encryption_key]):
+                return {"error": "Missing environment variables", "success": False}
+
+            # Fetch website by ID
+            url = f"{supabase_url}/rest/v1/websites?id=eq.{website_id}&select=*"
+            headers = {
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}"
+            }
+
+            response = await fetch(url, self._make_options("GET", headers))
+            if not response.ok:
+                return {"error": "Failed to fetch website", "success": False}
+
+            websites = list(await self._parse_json(response))
+            if not websites:
+                return {"error": "Website not found", "success": False}
+
+            website = dict(websites[0])
+            console.log(f"Generating content for: {website.get('name')}")
+
+            success = await self.process_website(website, supabase_url, supabase_key, encryption_key)
+
+            if success:
+                return {
+                    "success": True,
+                    "website_id": website_id,
+                    "message": "Content generated successfully"
+                }
+            else:
+                return {"success": False, "website_id": website_id, "error": "Generation failed"}
+
+        except Exception as e:
+            console.log(f"Single generate error: {str(e)}")
+            return {"error": str(e), "success": False}
 
     async def scan_website(
         self,

@@ -26,8 +26,9 @@ interface Props {
   searchParams: Promise<{ onboarding?: string }>;
 }
 
-export default async function WebsiteDetailPage({ params }: Props) {
+export default async function WebsiteDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const { onboarding } = await searchParams;
   const supabase = await createClient();
 
   const { data: website } = await supabase
@@ -87,6 +88,17 @@ export default async function WebsiteDetailPage({ params }: Props) {
             Back to Websites
           </Button>
         </Link>
+
+        {/* Onboarding Progress (shown during initial setup) */}
+        <OnboardingProgressWrapper
+          websiteId={id}
+          showOnboarding={
+            onboarding === "true" ||
+            (website.seo_config as Record<string, unknown> | null)?.onboarding_status === "scanning" ||
+            (website.seo_config as Record<string, unknown> | null)?.onboarding_status === "discovering" ||
+            (website.seo_config as Record<string, unknown> | null)?.onboarding_status === "generating"
+          }
+        />
 
         {/* Status Banner */}
         <Card className={website.is_active ? "border-green-200 bg-green-50" : "border-yellow-200 bg-yellow-50"}>

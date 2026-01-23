@@ -1,5 +1,4 @@
-import { createAdminClient, createServerClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   extractApiKey,
   validatePlatformApiKey,
@@ -33,7 +32,7 @@ async function authenticateRequest(request: Request): Promise<{ userId: string |
   const apiKey = extractApiKey(request);
   if (apiKey) {
     const auth = await validatePlatformApiKey(apiKey);
-    if (auth.valid) {
+    if (auth.valid && auth.userId) {
       return { userId: auth.userId };
     }
     return { userId: null, error: auth.error };
@@ -41,8 +40,7 @@ async function authenticateRequest(request: Request): Promise<{ userId: string |
 
   // Fall back to session auth
   try {
-    const cookieStore = await cookies();
-    const supabase = await createServerClient(cookieStore);
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       return { userId: user.id };
