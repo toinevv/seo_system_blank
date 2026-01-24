@@ -28,7 +28,6 @@ function SignupFormInner() {
   const [linkingSubscription, setLinkingSubscription] = useState(false);
 
   const searchParams = useSearchParams();
-  const supabase = createClient();
 
   // Check if coming from successful checkout
   const checkoutSuccess = searchParams.get("checkout") === "success";
@@ -54,6 +53,8 @@ function SignupFormInner() {
     setLoading(true);
     setError(null);
 
+    // Lazily create Supabase client only when user submits
+    const supabase = createClient();
     const { data, error: signupError } = await supabase.auth.signUp({
       email,
       password,
