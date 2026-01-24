@@ -736,6 +736,24 @@ function ArticleJsonLd({ article }) {
 
             {step === "database" && (
               <>
+                {/* Background Scan Status */}
+                {previewScanStatus === "scanning" && (
+                  <div className="rounded-md bg-blue-50 border border-blue-200 p-3 mb-4 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <p className="text-sm text-blue-800">
+                      Analyzing <strong>{formData.domain}</strong> in the background...
+                    </p>
+                  </div>
+                )}
+                {previewScanStatus === "done" && previewScanData && (
+                  <div className="rounded-md bg-green-50 border border-green-200 p-3 mb-4">
+                    <p className="text-sm text-green-800 flex items-center gap-2">
+                      <Check className="h-4 w-4" />
+                      Website analyzed: <strong>{previewScanData.niche_description ? previewScanData.niche_description.slice(0, 60) + "..." : formData.domain}</strong>
+                    </p>
+                  </div>
+                )}
+
                 {/* Credentials Section */}
                 <div className="rounded-md bg-muted p-4 mb-4">
                   <p className="text-sm">
@@ -932,6 +950,85 @@ function ArticleJsonLd({ article }) {
                   </div>
                 ) : (
                   <>
+                    {/* Website Scan Preview - Show what we discovered */}
+                    {previewScanStatus === "scanning" && (
+                      <div className="rounded-md bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-5">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-blue-900">Analyzing Your Website</h3>
+                            <p className="text-sm text-blue-700">Discovering topics and keywords for {formData.domain}...</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {previewScanStatus === "done" && previewScanData && (
+                      <div className="rounded-md bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-5">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                            <Sparkles className="h-5 w-5 text-emerald-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-emerald-900">We Found Great Content Opportunities!</h3>
+                            <p className="text-sm text-emerald-700">Here&apos;s what we discovered on {formData.domain}</p>
+                          </div>
+                        </div>
+
+                        {previewScanData.niche_description && (
+                          <div className="mb-4">
+                            <p className="text-sm font-medium text-gray-700 mb-1">Your Niche</p>
+                            <p className="text-sm text-gray-600 bg-white/60 rounded-md p-2">
+                              {previewScanData.niche_description}
+                            </p>
+                          </div>
+                        )}
+
+                        {previewScanData.content_themes && previewScanData.content_themes.length > 0 && (
+                          <div className="mb-4">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Content Themes We&apos;ll Write About</p>
+                            <div className="flex flex-wrap gap-2">
+                              {previewScanData.content_themes.slice(0, 5).map((theme, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800"
+                                >
+                                  {theme}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {previewScanData.main_keywords && previewScanData.main_keywords.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium text-gray-700 mb-2">Target Keywords</p>
+                            <div className="flex flex-wrap gap-2">
+                              {previewScanData.main_keywords.slice(0, 8).map((keyword, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center px-2 py-1 rounded text-xs bg-white/80 text-gray-700 border border-gray-200"
+                                >
+                                  {keyword}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {previewScanStatus === "error" && (
+                      <div className="rounded-md bg-amber-50 border border-amber-200 p-4">
+                        <p className="text-sm text-amber-800">
+                          <strong>Note:</strong> We couldn&apos;t fully analyze {formData.domain} yet.
+                          Don&apos;t worry - we&apos;ll do a complete scan after setup to find the best topics for your content.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="rounded-md bg-primary/5 border border-primary/20 p-6">
                       <div className="flex items-center gap-3 mb-4">
                         <CreditCard className="h-8 w-8 text-primary" />

@@ -119,6 +119,21 @@ class Default(WorkerEntrypoint):
                     result = await self.discover_all_topics()
                 return Response(json.dumps(result), headers={"Content-Type": "application/json"})
 
+            if "/scan-preview" in url:
+                # Preview scan - accepts domain directly, returns data without storing
+                domain = params.get("domain")
+                if domain:
+                    # URL decode the domain
+                    from urllib.parse import unquote
+                    domain = unquote(domain)
+                    result = await self.scan_preview(domain)
+                else:
+                    result = {"error": "domain parameter required", "success": False}
+                return Response(json.dumps(result), headers={
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"  # Allow CORS for preview
+                })
+
             if "/scan" in url:
                 # Support single-website scanning
                 if website_id:
@@ -129,8 +144,9 @@ class Default(WorkerEntrypoint):
 
             return Response(json.dumps({
                 "message": "SEO Content Generator Worker",
-                "endpoints": ["/health", "/trigger", "/generate", "/discover", "/scan"],
-                "single_website": "Add ?website_id=xxx to target a specific website"
+                "endpoints": ["/health", "/trigger", "/generate", "/discover", "/scan", "/scan-preview"],
+                "single_website": "Add ?website_id=xxx to target a specific website",
+                "preview_scan": "Use /scan-preview?domain=example.com for preview scanning"
             }), headers={"Content-Type": "application/json"})
 
         except Exception as e:
@@ -1267,6 +1283,148 @@ Output clean semantic HTML only - never wrap in code blocks or include document 
         except Exception as e:
             console.log(f"Single scan error: {str(e)}")
             return {"error": str(e), "success": False}
+
+    async def scan_preview(self, domain: str) -> dict:
+        """Preview scan - analyzes a domain without storing results (for onboarding preview)."""
+        import re
+
+        try:
+            console.log(f"Preview scanning domain: {domain}")
+
+            # Clean domain
+            domain = domain.lower().strip()
+            domain = re.sub(r'^https?://', '', domain)
+            domain = re.sub(r'^www\.', '', domain)
+            domain = domain.rstrip('/')
+
+            # Get platform OpenAI key
+            openai_key = getattr(self.env, "PLATFORM_OPENAI_KEY", None)
+
+            # Fetch homepage
+            homepage_url = f"https://{domain}"
+            homepage_html = await self.fetch_page_content(homepage_url)
+
+            if not homepage_html:
+                return {
+                    "success": False,
+                    "domain": domain,
+                    "error": f"Failed to fetch homepage: {homepage_url}"
+                }
+
+            # Extract metadata from homepage
+            homepage_data = self.extract_page_metadata(homepage_html, homepage_url)
+
+            # Find navigation links to scan more pages (limit to 3 for preview)
+            nav_links = self.identify_navigation_links(homepage_html, domain)
+            pages_data = [homepage_data]
+
+            for link in nav_links[:3]:
+                try:
+                    page_html = await self.fetch_page_content(link["url"])
+                    if page_html:
+                        page_data = self.extract_page_metadata(page_html, link["url"])
+                        pages_data.append(page_data)
+                except:
+                    pass
+
+            # Compile extracted data
+            all_keywords = []
+            all_headings = []
+            all_titles = []
+
+            for page in pages_data:
+                all_keywords.extend(page.get("meta_keywords", []))
+                all_headings.extend(page.get("headings", []))
+                if page.get("title"):
+                    all_titles.append(page["title"])
+
+            # Deduplicate
+            all_keywords = list(dict.fromkeys(all_keywords))[:30]
+            all_headings = list(dict.fromkeys(all_headings))[:20]
+
+            # If we have OpenAI key, do AI analysis
+            niche_description = None
+            content_themes = []
+
+            if openai_key and (all_keywords or all_headings or all_titles):
+                ai_analysis = await self.analyze_content_with_ai_preview(
+                    domain, all_titles, all_headings, all_keywords, openai_key
+                )
+                if ai_analysis:
+                    niche_description = ai_analysis.get("niche_description")
+                    content_themes = ai_analysis.get("content_themes", [])
+
+            return {
+                "success": True,
+                "domain": domain,
+                "data": {
+                    "homepage_title": homepage_data.get("title"),
+                    "meta_description": homepage_data.get("meta_description"),
+                    "niche_description": niche_description,
+                    "content_themes": content_themes,
+                    "main_keywords": all_keywords[:15],
+                    "headings": all_headings[:10],
+                    "pages_scanned": len(pages_data)
+                }
+            }
+
+        except Exception as e:
+            console.log(f"Preview scan error: {str(e)}")
+            return {"success": False, "domain": domain, "error": str(e)}
+
+    async def analyze_content_with_ai_preview(
+        self,
+        domain: str,
+        titles: list,
+        headings: list,
+        keywords: list,
+        api_key: str
+    ) -> dict:
+        """Analyze content with AI for preview scan (simplified version)."""
+        try:
+            prompt = f"""Analyze this website content and identify its niche and main themes.
+
+Domain: {domain}
+Page Titles: {', '.join(titles[:5])}
+Headings Found: {', '.join(headings[:15])}
+Keywords: {', '.join(keywords[:20])}
+
+Return ONLY valid JSON:
+{{
+    "niche_description": "A 1-2 sentence description of what this website is about",
+    "content_themes": ["theme1", "theme2", "theme3", "theme4", "theme5"]
+}}"""
+
+            response = await fetch(
+                "https://api.openai.com/v1/chat/completions",
+                self._make_options("POST", {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }, json.dumps({
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                        {"role": "system", "content": "You analyze websites and identify their niche. Return only JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 300,
+                    "temperature": 0.3
+                }))
+            )
+
+            if response.ok:
+                data = await self._parse_json(response)
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                # Parse JSON from response
+                content = content.strip()
+                if content.startswith("```"):
+                    content = content.split("```")[1]
+                    if content.startswith("json"):
+                        content = content[4:]
+                return json.loads(content)
+        except Exception as e:
+            console.log(f"AI preview analysis error: {str(e)}")
+
+        return None
 
     async def discover_for_single_website(self, website_id: str, count: int = 10) -> dict:
         """Discover topics for a single website (for onboarding flow)."""
