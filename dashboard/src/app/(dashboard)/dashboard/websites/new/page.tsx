@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/dashboard/header";
@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ArrowRight, Check, Loader2, Copy, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Copy, ExternalLink, CreditCard, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 // Common languages for SEO content
 const LANGUAGES = [
@@ -36,19 +37,44 @@ const extractSupabaseProjectId = (url: string): string | null => {
   return match ? match[1] : null;
 };
 
-type Step = "basic" | "database" | "frontend" | "review";
+type Step = "basic" | "database" | "frontend" | "checkout" | "review";
+
+const PLAN_DETAILS: Record<string, { name: string; price: number; geoPrice: number; articles: number }> = {
+  starter: { name: "Starter", price: 30, geoPrice: 35, articles: 3 },
+  pro: { name: "Pro", price: 75, geoPrice: 140, articles: 10 },
+  business: { name: "Business", price: 150, geoPrice: 290, articles: 30 },
+};
 
 export default function NewWebsitePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
-  const [step, setStep] = useState<Step>("basic");
+
+  // Get plan info from URL params (passed from signup)
+  const planKey = searchParams.get("plan") || "starter";
+  const withGeo = searchParams.get("geo") === "true";
+  const checkoutSuccess = searchParams.get("checkout") === "success";
+  const planDetails = PLAN_DETAILS[planKey] || PLAN_DETAILS.starter;
+  const displayPrice = withGeo ? planDetails.geoPrice : planDetails.price;
+
+  // Start at checkout step if coming back from successful payment
+  const [step, setStep] = useState<Step>(checkoutSuccess ? "review" : "basic");
   const [loading, setLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sqlCopied, setSqlCopied] = useState(false);
   const [frontendCopied, setFrontendCopied] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  // Preview scan state (runs in background while user fills database form)
+  const [previewScanStatus, setPreviewScanStatus] = useState<"idle" | "scanning" | "done" | "error">("idle");
+  const [previewScanData, setPreviewScanData] = useState<{
+    niche_description?: string;
+    content_themes?: string[];
+    main_keywords?: string[];
+  } | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -69,6 +95,22 @@ export default function NewWebsitePage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Restore form data from localStorage after returning from checkout
+  useEffect(() => {
+    if (checkoutSuccess) {
+      const savedData = localStorage.getItem("websiteSetupData");
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData);
+          setFormData(parsed);
+          localStorage.removeItem("websiteSetupData");
+        } catch (e) {
+          console.error("Failed to restore form data:", e);
+        }
+      }
+    }
+  }, [checkoutSuccess]);
+
   // Auto-generate product_id from domain
   const handleDomainChange = (domain: string) => {
     updateField("domain", domain);
@@ -80,6 +122,54 @@ export default function NewWebsitePage() {
         .toLowerCase();
       updateField("product_id", productId);
     }
+  };
+
+  // Trigger preview scan in background (fire and forget)
+  const triggerPreviewScan = async (domain: string) => {
+    if (!domain || previewScanStatus === "scanning") return;
+
+    const cleanDomain = domain
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .replace(/\/$/, "")
+      .toLowerCase();
+
+    if (!cleanDomain) return;
+
+    setPreviewScanStatus("scanning");
+    console.log("Starting preview scan for:", cleanDomain);
+
+    try {
+      const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || "https://seo-content-generator.ta-voeten.workers.dev";
+      const response = await fetch(`${workerUrl}/scan-preview?domain=${encodeURIComponent(cleanDomain)}`, {
+        method: "POST",
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setPreviewScanData(result.data);
+          setPreviewScanStatus("done");
+          console.log("Preview scan complete:", result.data);
+        } else {
+          setPreviewScanStatus("error");
+        }
+      } else {
+        setPreviewScanStatus("error");
+      }
+    } catch (err) {
+      console.error("Preview scan error:", err);
+      setPreviewScanStatus("error");
+    }
+  };
+
+  // Handle step navigation with preview scan trigger
+  const handleNextStep = (nextStep: Step) => {
+    // When moving from basic to database, trigger preview scan
+    if (step === "basic" && nextStep === "database" && formData.domain) {
+      triggerPreviewScan(formData.domain);
+    }
+    setStep(nextStep);
   };
 
   const handleSubmit = async () => {
@@ -165,6 +255,7 @@ export default function NewWebsitePage() {
     { key: "basic", title: "Basic Info", description: "Website name and settings" },
     { key: "database", title: "Database Setup", description: "Connect and configure your database" },
     { key: "frontend", title: "Frontend Guide", description: "How to display your blog" },
+    { key: "checkout", title: "Subscribe", description: "Activate your subscription" },
     { key: "review", title: "Review", description: "Confirm and create" },
   ];
 
@@ -177,8 +268,41 @@ export default function NewWebsitePage() {
         return formData.target_supabase_url && formData.target_supabase_service_key;
       case "frontend":
         return true; // Guide is informational
+      case "checkout":
+        return checkoutSuccess; // Can only proceed after successful payment
       default:
         return true;
+    }
+  };
+
+  // Handle Stripe checkout
+  const handleCheckout = async () => {
+    setCheckoutLoading(true);
+    setError(null);
+
+    try {
+      // Store form data in localStorage so we can restore it after checkout
+      localStorage.setItem("websiteSetupData", JSON.stringify(formData));
+
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: planKey, withGeo }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to start checkout");
+      }
+
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start checkout");
+      setCheckoutLoading(false);
     }
   };
 
@@ -794,8 +918,103 @@ function ArticleJsonLd({ article }) {
               </>
             )}
 
+            {step === "checkout" && (
+              <div className="space-y-6">
+                {checkoutSuccess ? (
+                  <div className="rounded-md bg-green-50 border border-green-200 p-4">
+                    <div className="flex items-center gap-2 text-green-800">
+                      <Check className="h-5 w-5" />
+                      <strong>Payment successful!</strong>
+                    </div>
+                    <p className="text-sm text-green-700 mt-1">
+                      Your subscription is now active. Click &quot;Next&quot; to finish creating your website.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="rounded-md bg-primary/5 border border-primary/20 p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <CreditCard className="h-8 w-8 text-primary" />
+                        <div>
+                          <h3 className="font-semibold text-lg">{planDetails.name} Plan</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {planDetails.articles} articles/month
+                            {withGeo && (
+                              <span className="inline-flex items-center gap-1 ml-2 text-primary">
+                                <Sparkles size={12} /> + GEO optimization
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-baseline gap-1 mb-4">
+                        <span className="text-3xl font-bold">€{displayPrice}</span>
+                        <span className="text-muted-foreground">/month</span>
+                      </div>
+                      <ul className="text-sm space-y-2 mb-6">
+                        <li className="flex items-center gap-2">
+                          <Check size={14} className="text-green-600" />
+                          {planDetails.articles} SEO-optimized articles per month
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check size={14} className="text-green-600" />
+                          Automatic topic discovery
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check size={14} className="text-green-600" />
+                          Google indexing requests
+                        </li>
+                        {withGeo && (
+                          <>
+                            <li className="flex items-center gap-2 text-primary">
+                              <Sparkles size={14} />
+                              GEO optimization for AI visibility
+                            </li>
+                            <li className="flex items-center gap-2 text-primary">
+                              <Sparkles size={14} />
+                              Optimized for ChatGPT, Perplexity, Claude
+                            </li>
+                          </>
+                        )}
+                      </ul>
+                      <Button
+                        onClick={handleCheckout}
+                        disabled={checkoutLoading}
+                        className="w-full"
+                        size="lg"
+                      >
+                        {checkoutLoading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Redirecting to checkout...
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Subscribe Now
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-xs text-muted-foreground text-center mt-3">
+                        Secure payment via Stripe. Cancel anytime.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {step === "review" && (
               <div className="space-y-4">
+                {checkoutSuccess && (
+                  <div className="rounded-md bg-green-50 border border-green-200 p-3 mb-4">
+                    <p className="text-sm text-green-800 flex items-center gap-2">
+                      <Check className="h-4 w-4" />
+                      Subscription active - {planDetails.name} plan
+                      {withGeo && " + GEO"}
+                    </p>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Website Name</p>
@@ -865,7 +1084,7 @@ function ArticleJsonLd({ article }) {
             </Button>
           ) : (
             <Button
-              onClick={() => setStep(steps[currentStepIndex + 1].key)}
+              onClick={() => handleNextStep(steps[currentStepIndex + 1].key)}
               disabled={!canProceed()}
             >
               Next

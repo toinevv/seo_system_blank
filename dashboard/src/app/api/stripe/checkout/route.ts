@@ -93,8 +93,9 @@ export async function POST(request: Request) {
             quantity: 1,
           },
         ],
-        success_url: `${origin}/dashboard?checkout=success`,
-        cancel_url: `${origin}/#pricing`,
+        // Redirect back to website setup wizard after successful payment
+        success_url: `${origin}/dashboard/websites/new?plan=${plan}&geo=${withGeo}&checkout=success`,
+        cancel_url: `${origin}/dashboard/websites/new?plan=${plan}&geo=${withGeo}`,
         metadata: {
           supabase_user_id: user.id,
         },

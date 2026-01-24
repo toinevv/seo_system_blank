@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Sparkles, Loader2, AlertCircle } from "lucide-react";
+import { Check, Sparkles, AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 const plans = [
@@ -80,7 +81,7 @@ const plans = [
 export function PricingTable() {
   const [geoEnabled, setGeoEnabled] = useState(true);
   const [showWarning, setShowWarning] = useState(false);
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleGeoToggle = () => {
     if (geoEnabled) {
@@ -99,46 +100,9 @@ export function PricingTable() {
     return `€${price % 1 === 0 ? price : price.toFixed(2)}`;
   };
 
-  const handleCheckout = async (planKey: string) => {
-    setLoadingPlan(planKey);
-
-    try {
-      const response = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: planKey, withGeo: geoEnabled }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.redirectToPortal) {
-          // User already has subscription, redirect to portal
-          const portalResponse = await fetch("/api/stripe/portal", {
-            method: "POST",
-          });
-          const portalData = await portalResponse.json();
-          if (portalData.url) {
-            window.location.href = portalData.url;
-            return;
-          }
-        }
-        // Show error
-        console.error("Checkout error:", data.error);
-        alert(data.error || "Failed to start checkout. Please try again.");
-        return;
-      }
-
-      // Redirect to Stripe Checkout (works for both guests and logged-in users)
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (error) {
-      console.error("Checkout error:", error);
-      alert("Failed to start checkout. Please try again.");
-    } finally {
-      setLoadingPlan(null);
-    }
+  const handleGetStarted = (planKey: string) => {
+    // Redirect to signup with plan info - after signup they'll be redirected to website setup
+    router.push(`/signup?plan=${planKey}&geo=${geoEnabled}`);
   };
 
   return (
@@ -296,17 +260,9 @@ export function PricingTable() {
                   variant={plan.highlighted ? "landing" : "landing-outline"}
                   size="sm"
                   className="w-full"
-                  onClick={() => handleCheckout(plan.planKey)}
-                  disabled={loadingPlan !== null}
+                  onClick={() => handleGetStarted(plan.planKey)}
                 >
-                  {loadingPlan === plan.planKey ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin mr-2" />
-                      Loading...
-                    </>
-                  ) : (
-                    plan.cta
-                  )}
+                  {plan.cta}
                 </Button>
               </div>
             );
