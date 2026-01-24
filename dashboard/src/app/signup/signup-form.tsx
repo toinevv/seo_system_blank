@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 
 const PLAN_DETAILS: Record<string, { name: string; price: number; geoPrice: number }> = {
   starter: { name: "Starter", price: 30, geoPrice: 35 },
@@ -29,8 +29,8 @@ function SignupFormInner() {
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
 
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Get plan info from URL params
@@ -63,7 +63,6 @@ function SignupFormInner() {
           selected_plan: planKey || null,
           selected_geo: withGeo,
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectUrl)}`,
       },
     });
 
@@ -73,37 +72,11 @@ function SignupFormInner() {
       return;
     }
 
-    setSuccess(true);
-    setLoading(false);
+    // Email verification is disabled - user is logged in immediately
+    // Redirect straight to website setup for faster conversion
+    router.push(redirectUrl);
+    router.refresh();
   };
-
-  if (success) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-6 w-6 text-green-500" />
-              <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
-            </div>
-            <CardDescription>
-              We&apos;ve sent you a confirmation link. Please check your email to verify your account.
-              <span className="block mt-2 font-medium text-foreground">
-                After verification, you&apos;ll be taken to set up your first website.
-              </span>
-            </CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <Link href="/login" className="w-full">
-              <Button variant="outline" className="w-full">
-                Back to login
-              </Button>
-            </Link>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
