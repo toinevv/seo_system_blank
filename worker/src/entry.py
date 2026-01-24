@@ -94,6 +94,15 @@ class Default(WorkerEntrypoint):
         params = self._parse_query_params(url)
         website_id = params.get("website_id")
 
+        # Handle CORS preflight requests
+        if request.method == "OPTIONS":
+            return Response("", headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                "Access-Control-Max-Age": "86400",  # Cache preflight for 24 hours
+            })
+
         try:
             if "/health" in url:
                 return Response(json.dumps({

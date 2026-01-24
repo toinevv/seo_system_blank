@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ArrowRight, Check, Loader2, Copy, ExternalLink, CreditCard, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Copy, ExternalLink, CreditCard, Sparkles, X, AlertTriangle, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -76,6 +76,33 @@ export default function NewWebsitePage() {
     main_keywords?: string[];
   } | null>(null);
 
+  // Plan selection state (user can choose plan during checkout step)
+  const [selectedPlan, setSelectedPlan] = useState<string>(planKey);
+  const [enableGeo, setEnableGeo] = useState<boolean>(withGeo);
+  const [skippedPayment, setSkippedPayment] = useState(false);
+
+  // FOMO pop-up state
+  const [showFomoPopup, setShowFomoPopup] = useState(false);
+  const [fomoPopupIndex, setFomoPopupIndex] = useState(0);
+
+  const FOMO_MESSAGES = [
+    {
+      title: "Your competitors are ranking higher",
+      message: "Every day without SEO content means potential customers finding your competitors instead.",
+      icon: TrendingUp,
+    },
+    {
+      title: "Google isn't indexing your site",
+      message: "Without regular content updates, search engines deprioritize your website.",
+      icon: AlertTriangle,
+    },
+    {
+      title: "Missing out on organic traffic",
+      message: "SEO-optimized content can bring 10x more visitors than paid ads long-term.",
+      icon: TrendingUp,
+    },
+  ];
+
   // Form state
   const [formData, setFormData] = useState({
     // Basic info
@@ -110,6 +137,27 @@ export default function NewWebsitePage() {
       }
     }
   }, [checkoutSuccess]);
+
+  // FOMO pop-ups when user skips payment
+  useEffect(() => {
+    if (!skippedPayment) return;
+
+    // Show first pop-up after 5 seconds
+    const firstTimeout = setTimeout(() => {
+      setShowFomoPopup(true);
+    }, 5000);
+
+    // Cycle through messages every 30 seconds
+    const interval = setInterval(() => {
+      setFomoPopupIndex((prev) => (prev + 1) % FOMO_MESSAGES.length);
+      setShowFomoPopup(true);
+    }, 30000);
+
+    return () => {
+      clearTimeout(firstTimeout);
+      clearInterval(interval);
+    };
+  }, [skippedPayment, FOMO_MESSAGES.length]);
 
   // Auto-generate product_id from domain
   const handleDomainChange = (domain: string) => {
@@ -269,10 +317,16 @@ export default function NewWebsitePage() {
       case "frontend":
         return true; // Guide is informational
       case "checkout":
-        return checkoutSuccess; // Can only proceed after successful payment
+        return checkoutSuccess || skippedPayment; // Can proceed after payment OR skip
       default:
         return true;
     }
+  };
+
+  // Handle skip payment (continue without subscription)
+  const handleSkipPayment = () => {
+    setSkippedPayment(true);
+    handleNextStep("review");
   };
 
   // Handle Stripe checkout
@@ -287,7 +341,7 @@ export default function NewWebsitePage() {
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: planKey, withGeo }),
+        body: JSON.stringify({ plan: selectedPlan, withGeo: enableGeo }),
       });
 
       const data = await response.json();
@@ -1029,51 +1083,85 @@ function ArticleJsonLd({ article }) {
                       </div>
                     )}
 
-                    <div className="rounded-md bg-primary/5 border border-primary/20 p-6">
-                      <div className="flex items-center gap-3 mb-4">
-                        <CreditCard className="h-8 w-8 text-primary" />
-                        <div>
-                          <h3 className="font-semibold text-lg">{planDetails.name} Plan</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {planDetails.articles} articles/month
-                            {withGeo && (
-                              <span className="inline-flex items-center gap-1 ml-2 text-primary">
-                                <Sparkles size={12} /> + GEO optimization
-                              </span>
+                    {/* Plan Selection Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {Object.entries(PLAN_DETAILS).map(([key, plan]) => {
+                        const isSelected = selectedPlan === key;
+                        const price = enableGeo ? plan.geoPrice : plan.price;
+                        return (
+                          <div
+                            key={key}
+                            onClick={() => setSelectedPlan(key)}
+                            className={`relative rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                              isSelected
+                                ? "border-primary bg-primary/5 shadow-md"
+                                : "border-muted hover:border-primary/50"
+                            }`}
+                          >
+                            {key === "pro" && (
+                              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-primary text-primary-foreground text-xs font-medium rounded-full">
+                                Popular
+                              </div>
                             )}
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                                isSelected ? "border-primary" : "border-muted-foreground"
+                              }`}>
+                                {isSelected && <div className="h-2 w-2 rounded-full bg-primary" />}
+                              </div>
+                              <h4 className="font-semibold">{plan.name}</h4>
+                            </div>
+                            <div className="flex items-baseline gap-1 mb-3">
+                              <span className="text-2xl font-bold">€{price}</span>
+                              <span className="text-sm text-muted-foreground">/mo</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {plan.articles} articles/month
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* GEO Optimization Toggle */}
+                    <div
+                      onClick={() => setEnableGeo(!enableGeo)}
+                      className={`flex items-center justify-between rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                        enableGeo
+                          ? "border-primary bg-gradient-to-r from-primary/10 to-purple-500/10"
+                          : "border-muted hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Sparkles className={`h-5 w-5 ${enableGeo ? "text-primary" : "text-muted-foreground"}`} />
+                        <div>
+                          <p className="font-medium">Add GEO Optimization</p>
+                          <p className="text-sm text-muted-foreground">
+                            Optimize for AI search (ChatGPT, Perplexity, Claude)
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-baseline gap-1 mb-4">
-                        <span className="text-3xl font-bold">€{displayPrice}</span>
-                        <span className="text-muted-foreground">/month</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-primary">
+                          +€{(PLAN_DETAILS[selectedPlan]?.geoPrice || 0) - (PLAN_DETAILS[selectedPlan]?.price || 0)}/mo
+                        </span>
+                        <div className={`h-6 w-11 rounded-full transition-colors ${enableGeo ? "bg-primary" : "bg-muted"}`}>
+                          <div className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform mt-0.5 ${enableGeo ? "translate-x-5 ml-0.5" : "translate-x-0.5"}`} />
+                        </div>
                       </div>
-                      <ul className="text-sm space-y-2 mb-6">
-                        <li className="flex items-center gap-2">
-                          <Check size={14} className="text-green-600" />
-                          {planDetails.articles} SEO-optimized articles per month
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Check size={14} className="text-green-600" />
-                          Automatic topic discovery
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Check size={14} className="text-green-600" />
-                          Google indexing requests
-                        </li>
-                        {withGeo && (
-                          <>
-                            <li className="flex items-center gap-2 text-primary">
-                              <Sparkles size={14} />
-                              GEO optimization for AI visibility
-                            </li>
-                            <li className="flex items-center gap-2 text-primary">
-                              <Sparkles size={14} />
-                              Optimized for ChatGPT, Perplexity, Claude
-                            </li>
-                          </>
-                        )}
-                      </ul>
+                    </div>
+
+                    {/* Summary & Checkout */}
+                    <div className="rounded-lg bg-muted/50 p-4">
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="font-medium">Total</span>
+                        <div className="text-right">
+                          <span className="text-2xl font-bold">
+                            €{enableGeo ? PLAN_DETAILS[selectedPlan]?.geoPrice : PLAN_DETAILS[selectedPlan]?.price}
+                          </span>
+                          <span className="text-muted-foreground">/month</span>
+                        </div>
+                      </div>
                       <Button
                         onClick={handleCheckout}
                         disabled={checkoutLoading}
@@ -1088,12 +1176,25 @@ function ArticleJsonLd({ article }) {
                         ) : (
                           <>
                             <CreditCard className="h-4 w-4 mr-2" />
-                            Subscribe Now
+                            Subscribe to {PLAN_DETAILS[selectedPlan]?.name}
                           </>
                         )}
                       </Button>
-                      <p className="text-xs text-muted-foreground text-center mt-3">
+                      <p className="text-xs text-muted-foreground text-center mt-2">
                         Secure payment via Stripe. Cancel anytime.
+                      </p>
+                    </div>
+
+                    {/* Skip Payment Option */}
+                    <div className="text-center pt-2">
+                      <button
+                        onClick={handleSkipPayment}
+                        className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+                      >
+                        Continue without subscribing →
+                      </button>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Your website will be created but content generation won&apos;t start
                       </p>
                     </div>
                   </>
@@ -1107,9 +1208,23 @@ function ArticleJsonLd({ article }) {
                   <div className="rounded-md bg-green-50 border border-green-200 p-3 mb-4">
                     <p className="text-sm text-green-800 flex items-center gap-2">
                       <Check className="h-4 w-4" />
-                      Subscription active - {planDetails.name} plan
-                      {withGeo && " + GEO"}
+                      Subscription active - {PLAN_DETAILS[selectedPlan]?.name} plan
+                      {enableGeo && " + GEO"}
                     </p>
+                  </div>
+                )}
+                {skippedPayment && (
+                  <div className="rounded-md bg-amber-50 border border-amber-200 p-3 mb-4">
+                    <p className="text-sm text-amber-800 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      No subscription - Content generation won&apos;t start automatically
+                    </p>
+                    <button
+                      onClick={() => setStep("checkout")}
+                      className="text-sm text-amber-900 font-medium underline mt-1"
+                    >
+                      Go back to subscribe →
+                    </button>
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4">
@@ -1190,6 +1305,45 @@ function ArticleJsonLd({ article }) {
           )}
         </div>
       </div>
+
+      {/* FOMO Pop-up for users who skipped payment */}
+      {showFomoPopup && skippedPayment && (
+        <div className="fixed bottom-4 right-4 max-w-sm animate-in slide-in-from-bottom-5 z-50">
+          <div className="bg-white rounded-lg shadow-xl border border-red-200 p-4">
+            <button
+              onClick={() => setShowFomoPopup(false)}
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                {(() => {
+                  const IconComponent = FOMO_MESSAGES[fomoPopupIndex].icon;
+                  return <IconComponent className="h-5 w-5 text-red-600" />;
+                })()}
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900">
+                  {FOMO_MESSAGES[fomoPopupIndex].title}
+                </h4>
+                <p className="text-sm text-gray-600 mt-1">
+                  {FOMO_MESSAGES[fomoPopupIndex].message}
+                </p>
+                <button
+                  onClick={() => {
+                    setShowFomoPopup(false);
+                    setStep("checkout");
+                  }}
+                  className="mt-3 text-sm font-medium text-primary hover:underline"
+                >
+                  Start generating content now →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
