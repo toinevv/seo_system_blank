@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Check, Copy, Terminal, Bot, Database, Zap } from "lucide-react";
+import { Check, Copy, Terminal, Bot, Database, Zap, ChevronDown, ChevronUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // Full prompt for AI agents (Lovable, Cursor, etc.)
@@ -51,10 +51,13 @@ const CLI_COMMAND = `INDEXYOURNICHE_API_KEY=<YOUR_API_KEY> npx @indexyourniche/c
 export function Hero() {
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [copiedCli, setCopiedCli] = useState(false);
+  const [showPromptModal, setShowPromptModal] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const copyPrompt = () => {
     navigator.clipboard.writeText(AI_PROMPT);
     setCopiedPrompt(true);
+    setShowPromptModal(true);
     setTimeout(() => setCopiedPrompt(false), 2000);
   };
 
@@ -63,6 +66,18 @@ export function Hero() {
     setCopiedCli(true);
     setTimeout(() => setCopiedCli(false), 2000);
   };
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (showPromptModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showPromptModal]);
 
   return (
     <section className="relative pt-24 pb-16 px-4 overflow-hidden">
@@ -143,12 +158,31 @@ export function Hero() {
         </div>
 
         {/* Helper text */}
-        <p className="text-xs text-landing-text-muted mb-6">
+        <p className="text-xs text-landing-text-muted mb-4">
           Paste to Cursor, Lovable, Claude Code, or run in terminal.{" "}
           <Link href="/signup" className="text-landing-accent hover:underline">
             Get your API key →
           </Link>
         </p>
+
+        {/* Collapsible Preview */}
+        <div className="max-w-2xl mx-auto mb-6">
+          <button
+            onClick={() => setShowPreview(!showPreview)}
+            className="flex items-center gap-1.5 mx-auto text-xs text-landing-text-muted hover:text-landing-accent transition-colors"
+          >
+            {showPreview ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {showPreview ? "Hide prompt preview" : "Preview what you're copying"}
+          </button>
+
+          {showPreview && (
+            <div className="mt-3 p-4 bg-landing-card border border-landing-border rounded-lg text-left">
+              <pre className="text-xs text-landing-text-muted whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto">
+                {AI_PROMPT}
+              </pre>
+            </div>
+          )}
+        </div>
 
         {/* Trust Indicators */}
         <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-landing-text-muted">
@@ -171,6 +205,76 @@ export function Hero() {
           </Link>
         </div>
       </div>
+
+      {/* Copied Prompt Modal */}
+      {showPromptModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowPromptModal(false)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+          {/* Modal Content */}
+          <div
+            className="relative w-full max-w-2xl bg-landing-bg border border-landing-border rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-landing-border">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center w-8 h-8 bg-green-500/10 rounded-full">
+                  <Check className="h-4 w-4 text-green-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-landing-text">
+                  Prompt Copied!
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowPromptModal(false)}
+                className="p-1.5 text-landing-text-muted hover:text-landing-text transition-colors rounded-lg hover:bg-landing-card"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-landing-text-muted">
+                Paste this into Cursor, Lovable, Claude Code, or your AI coding assistant:
+              </p>
+              <div className="p-4 bg-landing-card border border-landing-border rounded-lg">
+                <pre className="text-xs text-landing-text whitespace-pre-wrap font-mono leading-relaxed max-h-72 overflow-y-auto">
+                  {AI_PROMPT}
+                </pre>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-2 p-4 border-t border-landing-border">
+              <Button
+                variant="landing-outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(AI_PROMPT);
+                  setCopiedPrompt(true);
+                  setTimeout(() => setCopiedPrompt(false), 2000);
+                }}
+              >
+                {copiedPrompt ? <Check size={14} /> : <Copy size={14} />}
+                {copiedPrompt ? "Copied!" : "Copy Again"}
+              </Button>
+              <Button
+                variant="landing"
+                size="sm"
+                onClick={() => setShowPromptModal(false)}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
