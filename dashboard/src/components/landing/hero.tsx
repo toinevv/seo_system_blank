@@ -5,14 +5,11 @@ import Link from "next/link";
 import { Check, Copy, Terminal, Bot, Database, Zap, ChevronDown, ChevronUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Full prompt for AI agents (Lovable, Cursor, etc.)
-const AI_PROMPT = `Set up IndexYourNiche SEO automation for this project.
+// Full prompt for AI agents (Lovable, Cursor, Bolt, Replit, etc.)
+const AI_PROMPT = `Add IndexYourNiche SEO blog to this project. This will automatically generate SEO-optimized articles written directly to your Supabase database.
 
-1. Add these to .env.local (get from Supabase Dashboard → Settings → API):
-   NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...
-
-2. Create the articles table by running this SQL in Supabase SQL Editor:
+## Step 1: Create Articles Table
+Run this SQL in your Supabase SQL Editor (Supabase Dashboard → SQL Editor):
 
 CREATE TABLE IF NOT EXISTS public.blog_articles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -36,14 +33,43 @@ ALTER TABLE public.blog_articles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public can read published" ON public.blog_articles FOR SELECT USING (status = 'published');
 GRANT SELECT ON public.blog_articles TO anon;
 
-3. Run setup command:
-   INDEXYOURNICHE_API_KEY=<YOUR_API_KEY> npx @indexyourniche/cli init -y -d <YOUR_DOMAIN>
+## Step 2: Register at IndexYourNiche
+Go to https://indexyourniche.com/signup and:
+1. Create an account
+2. Add your website (domain like "myapp.com")
+3. Enter your Supabase credentials (get from Supabase Dashboard → Settings → API):
+   - NEXT_PUBLIC_SUPABASE_URL
+   - SUPABASE_SERVICE_ROLE_KEY
+4. Choose a plan and complete payment
 
-4. Generate content:
-   iyn scan && iyn topics --discover && iyn generate -y
+Articles will be generated automatically after signup! 🎉
 
-Get your API key at: https://indexyourniche.com/signup
-AI content generation is INCLUDED - no OpenAI/Anthropic keys needed!`;
+## Step 3: Build Blog Frontend
+Create these files to display your SEO-optimized articles:
+
+### 3a. Blog Listing Page (app/blog/page.tsx)
+- Fetch all articles from Supabase: SELECT * FROM blog_articles WHERE status = 'published' ORDER BY published_at DESC
+- Display as card grid with title, excerpt, published_at
+- Add meta tags: title="Blog | YourSite", description="Latest articles..."
+
+### 3b. Article Page (app/blog/[slug]/page.tsx)
+- Fetch single article by slug
+- Render: title (h1), tldr box (highlighted summary), content (as HTML), faq_items (as FAQ accordion)
+- SEO meta tags: use title, meta_description, cover_image_url from the article
+- Add JSON-LD Article schema for Google
+
+### 3c. Sitemap (app/sitemap.ts)
+- Generate sitemap including all blog article URLs
+- Format: /blog/[slug] for each published article
+
+## Step 4: Done!
+Check your /blog page - articles should appear automatically.
+New articles are generated weekly based on your site's niche.
+
+---
+💡 AI content generation is INCLUDED - no OpenAI/Anthropic keys needed!
+💡 Articles appear in YOUR Supabase database automatically.
+💡 Just build the frontend to display them.`;
 
 // CLI one-liner
 const CLI_COMMAND = `INDEXYOURNICHE_API_KEY=<YOUR_API_KEY> npx @indexyourniche/cli init -y -d yoursite.com && iyn scan && iyn topics --discover && iyn generate -y`;
@@ -264,13 +290,11 @@ export function Hero() {
                 {copiedPrompt ? <Check size={14} /> : <Copy size={14} />}
                 {copiedPrompt ? "Copied!" : "Copy Again"}
               </Button>
-              <Button
-                variant="landing"
-                size="sm"
-                onClick={() => setShowPromptModal(false)}
-              >
-                Done
-              </Button>
+              <Link href="/signup">
+                <Button variant="landing" size="sm">
+                  Start Now →
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
