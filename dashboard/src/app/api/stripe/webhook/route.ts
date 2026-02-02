@@ -91,8 +91,10 @@ export async function POST(request: Request) {
         const subscription = event.data.object as Stripe.Subscription;
         const userId = subscription.metadata?.supabase_user_id;
 
+        if (userId) {
+          await updateUserSubscription(adminClient, userId, subscription);
+        }
         console.log(`Subscription created: ${subscription.id} for user ${userId}`);
-        // Subscription is now active - user has access to paid features
         break;
       }
 
@@ -100,9 +102,12 @@ export async function POST(request: Request) {
         const subscription = event.data.object as Stripe.Subscription;
         const userId = subscription.metadata?.supabase_user_id;
 
+        if (userId) {
+          await updateUserSubscription(adminClient, userId, subscription);
+        }
+
         console.log(`Subscription updated: ${subscription.id}, status: ${subscription.status}`);
 
-        // Handle plan changes, cancellation scheduled, etc.
         if (subscription.cancel_at_period_end) {
           console.log(`Subscription ${subscription.id} will cancel at period end`);
         }
@@ -113,8 +118,20 @@ export async function POST(request: Request) {
         const subscription = event.data.object as Stripe.Subscription;
         const userId = subscription.metadata?.supabase_user_id;
 
+        if (userId) {
+          // Clear subscription data when deleted
+          await adminClient
+            .from("profiles")
+            .update({
+              subscription_plan: null,
+              subscription_status: "canceled",
+              subscription_period_end: null,
+              has_geo_optimization: false,
+            })
+            .eq("id", userId);
+        }
+
         console.log(`Subscription deleted: ${subscription.id} for user ${userId}`);
-        // User is now on free plan
         break;
       }
 

@@ -9,8 +9,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { ArrowLeft, Save, Loader2, Trash2, Key, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Trash2, Key, AlertTriangle, Sparkles, Clock, FileText } from "lucide-react";
 import type { Website, GenerationLog } from "@/types/database";
+
+// Content format definitions (matches worker/src/entry.py)
+const CONTENT_FORMATS = {
+  listicle: { name: "Listicle", description: "Numbered list format - tips, rankings, quick reads" },
+  how_to_guide: { name: "How-To Guide", description: "Step-by-step tutorials and processes" },
+  deep_dive: { name: "Deep Dive", description: "In-depth analysis for complex topics" },
+  comparison: { name: "Comparison", description: "Side-by-side product/service comparisons" },
+  case_study: { name: "Case Study", description: "Real-world examples demonstrating results" },
+  qa_interview: { name: "Q&A Interview", description: "Question and answer format" },
+  news_commentary: { name: "News Commentary", description: "Timely analysis of trends" },
+  ultimate_guide: { name: "Ultimate Guide", description: "Comprehensive definitive guides" },
+};
+
+const VOICE_STYLES = {
+  conversational: { name: "Conversational", description: "Friendly, uses contractions, personal" },
+  professional: { name: "Professional", description: "Formal, no contractions, uses 'we'" },
+  expert: { name: "Expert", description: "Authoritative, technical, detailed" },
+  friendly: { name: "Friendly", description: "Casual, warm, may use emoji" },
+};
+
+const DAYS_OF_WEEK = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
 // Smart error notification helper
 function getErrorNotification(errorMessage: string | null): { message: string; type: "warning" | "error" } | null {
@@ -68,6 +89,24 @@ export default function SettingsPage() {
     is_active: true,
     system_prompt_openai: "",
     system_prompt_claude: "",
+    // Content format settings
+    content_formats: Object.keys(CONTENT_FORMATS) as string[],
+    voice_style: "conversational",
+    human_elements: {
+      rhetorical_questions: true,
+      conversational_asides: true,
+      opinion_markers: true,
+      uncertainty_markers: true,
+      anecdote_hints: true,
+      transition_variety: true,
+    },
+    // Time variation settings
+    time_variation_mode: "fixed" as "fixed" | "window" | "random",
+    posting_window_start: "08:00",
+    posting_window_end: "18:00",
+    preferred_days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+    min_hours_between_posts: 24,
+    max_hours_between_posts: 96,
   });
 
   // API keys form
@@ -102,6 +141,24 @@ export default function SettingsPage() {
         is_active: data.is_active,
         system_prompt_openai: data.system_prompt_openai || "",
         system_prompt_claude: data.system_prompt_claude || "",
+        // Content format settings
+        content_formats: data.content_formats || Object.keys(CONTENT_FORMATS),
+        voice_style: data.voice_style || "conversational",
+        human_elements: data.human_elements || {
+          rhetorical_questions: true,
+          conversational_asides: true,
+          opinion_markers: true,
+          uncertainty_markers: true,
+          anecdote_hints: true,
+          transition_variety: true,
+        },
+        // Time variation settings
+        time_variation_mode: data.time_variation_mode || "fixed",
+        posting_window_start: data.posting_window_start?.slice(0, 5) || "08:00",
+        posting_window_end: data.posting_window_end?.slice(0, 5) || "18:00",
+        preferred_days: data.preferred_days || ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        min_hours_between_posts: data.min_hours_between_posts || 24,
+        max_hours_between_posts: data.max_hours_between_posts || 96,
       });
     }
     setLoading(false);
@@ -154,6 +211,17 @@ export default function SettingsPage() {
         is_active: formData.is_active,
         system_prompt_openai: formData.system_prompt_openai || null,
         system_prompt_claude: formData.system_prompt_claude || null,
+        // Content format settings
+        content_formats: formData.content_formats,
+        voice_style: formData.voice_style,
+        human_elements: formData.human_elements,
+        // Time variation settings
+        time_variation_mode: formData.time_variation_mode,
+        posting_window_start: formData.posting_window_start,
+        posting_window_end: formData.posting_window_end,
+        preferred_days: formData.preferred_days,
+        min_hours_between_posts: formData.min_hours_between_posts,
+        max_hours_between_posts: formData.max_hours_between_posts,
       })
       .eq("id", websiteId);
 
@@ -164,6 +232,37 @@ export default function SettingsPage() {
     }
 
     setSaving(false);
+  };
+
+  // Toggle content format
+  const toggleContentFormat = (format: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      content_formats: prev.content_formats.includes(format)
+        ? prev.content_formats.filter((f) => f !== format)
+        : [...prev.content_formats, format],
+    }));
+  };
+
+  // Toggle human element
+  const toggleHumanElement = (element: keyof typeof formData.human_elements) => {
+    setFormData((prev) => ({
+      ...prev,
+      human_elements: {
+        ...prev.human_elements,
+        [element]: !prev.human_elements[element],
+      },
+    }));
+  };
+
+  // Toggle preferred day
+  const togglePreferredDay = (day: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      preferred_days: prev.preferred_days.includes(day)
+        ? prev.preferred_days.filter((d) => d !== day)
+        : [...prev.preferred_days, day],
+    }));
   };
 
   const handleSaveApiKeys = async () => {
@@ -331,6 +430,272 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Content Formats */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Content Formats
+            </CardTitle>
+            <CardDescription>
+              Select which article formats to rotate between. Content will randomly use one of these formats for variety.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {Object.entries(CONTENT_FORMATS).map(([key, format]) => (
+                <label
+                  key={key}
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    formData.content_formats.includes(key)
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-muted-foreground/50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.content_formats.includes(key)}
+                    onChange={() => toggleContentFormat(key)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">{format.name}</div>
+                    <div className="text-xs text-muted-foreground">{format.description}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            {formData.content_formats.length === 0 && (
+              <p className="text-sm text-yellow-600">Select at least one format. All formats will be enabled if none selected.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Voice & Tone */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Voice & Tone
+            </CardTitle>
+            <CardDescription>
+              Configure writing style for more genuine, human-like content that avoids AI detection.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Voice Style Selector */}
+            <div className="space-y-2">
+              <Label>Voice Style</Label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {Object.entries(VOICE_STYLES).map(([key, style]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, voice_style: key })}
+                    className={`p-3 rounded-lg border text-left transition-colors ${
+                      formData.voice_style === key
+                        ? "border-primary bg-primary/5"
+                        : "border-muted hover:border-muted-foreground/50"
+                    }`}
+                  >
+                    <div className="font-medium text-sm">{style.name}</div>
+                    <div className="text-xs text-muted-foreground">{style.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Human Elements */}
+            <div className="space-y-3">
+              <Label>Human Elements (Anti-AI Detection)</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.human_elements.rhetorical_questions}
+                    onChange={() => toggleHumanElement("rhetorical_questions")}
+                  />
+                  Rhetorical questions
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.human_elements.conversational_asides}
+                    onChange={() => toggleHumanElement("conversational_asides")}
+                  />
+                  Conversational asides
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.human_elements.opinion_markers}
+                    onChange={() => toggleHumanElement("opinion_markers")}
+                  />
+                  Opinion markers
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.human_elements.uncertainty_markers}
+                    onChange={() => toggleHumanElement("uncertainty_markers")}
+                  />
+                  Uncertainty markers
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.human_elements.anecdote_hints}
+                    onChange={() => toggleHumanElement("anecdote_hints")}
+                  />
+                  Anecdotes & experiences
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.human_elements.transition_variety}
+                    onChange={() => toggleHumanElement("transition_variety")}
+                  />
+                  Varied transitions
+                </label>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Time Variation */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Posting Time Variation
+            </CardTitle>
+            <CardDescription>
+              Randomize posting times to appear more natural and avoid predictable patterns.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Time Variation Mode */}
+            <div className="space-y-2">
+              <Label>Schedule Mode</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, time_variation_mode: "fixed" })}
+                  className={`p-3 rounded-lg border text-left transition-colors ${
+                    formData.time_variation_mode === "fixed"
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-muted-foreground/50"
+                  }`}
+                >
+                  <div className="font-medium text-sm">Fixed</div>
+                  <div className="text-xs text-muted-foreground">Same time every post</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, time_variation_mode: "window" })}
+                  className={`p-3 rounded-lg border text-left transition-colors ${
+                    formData.time_variation_mode === "window"
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-muted-foreground/50"
+                  }`}
+                >
+                  <div className="font-medium text-sm">Window</div>
+                  <div className="text-xs text-muted-foreground">Random within time window</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, time_variation_mode: "random" })}
+                  className={`p-3 rounded-lg border text-left transition-colors ${
+                    formData.time_variation_mode === "random"
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-muted-foreground/50"
+                  }`}
+                >
+                  <div className="font-medium text-sm">Random</div>
+                  <div className="text-xs text-muted-foreground">Fully randomized times</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Time Window (shown for window mode) */}
+            {formData.time_variation_mode === "window" && (
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="window_start">Window Start</Label>
+                    <Input
+                      id="window_start"
+                      type="time"
+                      value={formData.posting_window_start}
+                      onChange={(e) => setFormData({ ...formData, posting_window_start: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="window_end">Window End</Label>
+                    <Input
+                      id="window_end"
+                      type="time"
+                      value={formData.posting_window_end}
+                      onChange={(e) => setFormData({ ...formData, posting_window_end: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Preferred Days */}
+                <div className="space-y-2">
+                  <Label>Preferred Days</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DAYS_OF_WEEK.map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => togglePreferredDay(day)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                          formData.preferred_days.includes(day)
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {day.charAt(0).toUpperCase() + day.slice(1, 3)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Hours Between Posts (for window and random modes) */}
+            {formData.time_variation_mode !== "fixed" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="min_hours">Min Hours Between Posts</Label>
+                  <Input
+                    id="min_hours"
+                    type="number"
+                    min={1}
+                    value={formData.min_hours_between_posts}
+                    onChange={(e) =>
+                      setFormData({ ...formData, min_hours_between_posts: parseInt(e.target.value) || 24 })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="max_hours">Max Hours Between Posts</Label>
+                  <Input
+                    id="max_hours"
+                    type="number"
+                    min={1}
+                    value={formData.max_hours_between_posts}
+                    onChange={(e) =>
+                      setFormData({ ...formData, max_hours_between_posts: parseInt(e.target.value) || 96 })
+                    }
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

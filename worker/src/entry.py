@@ -11,6 +11,175 @@ import json
 import base64
 from datetime import datetime, timedelta
 from typing import Optional
+import random
+
+# =============================================
+# CONTENT FORMAT DEFINITIONS
+# =============================================
+# Each format has a unique structure, tone, and heading style
+# to create varied, genuine content that avoids AI detection patterns
+
+CONTENT_FORMATS = {
+    "listicle": {
+        "name": "Listicle",
+        "description": "Numbered list format - great for tips, rankings, and quick reads",
+        "structure": [
+            ("intro", "Opening hook with the promise of value (2-3 sentences)"),
+            ("numbered_items", "5-10 numbered items, each with a heading and 2-3 paragraph explanation"),
+            ("expert_tip", "A bonus expert tip or insider insight"),
+            ("conclusion", "Brief wrap-up with key takeaway")
+        ],
+        "tone": "energetic",
+        "heading_style": "numbered",
+        "word_range": (800, 1200)
+    },
+    "how_to_guide": {
+        "name": "How-To Guide",
+        "description": "Step-by-step tutorial format - ideal for tutorials and processes",
+        "structure": [
+            ("problem_intro", "Describe the problem this guide solves (2-3 sentences)"),
+            ("what_youll_learn", "Brief overview of what reader will accomplish"),
+            ("prerequisites", "What the reader needs before starting (optional)"),
+            ("steps", "Numbered steps with clear instructions, each step gets its own heading"),
+            ("troubleshooting", "Common problems and solutions"),
+            ("conclusion", "Summary and next steps")
+        ],
+        "tone": "instructional",
+        "heading_style": "step",
+        "word_range": (1000, 1500)
+    },
+    "deep_dive": {
+        "name": "Deep Dive Analysis",
+        "description": "In-depth exploration - perfect for complex topics requiring thorough coverage",
+        "structure": [
+            ("executive_summary", "TL;DR of the key findings (50-75 words)"),
+            ("background", "Context and why this matters"),
+            ("analysis", "Main analysis with multiple sections exploring different angles"),
+            ("implications", "What this means for the reader"),
+            ("conclusion", "Key takeaways and recommendations")
+        ],
+        "tone": "analytical",
+        "heading_style": "descriptive",
+        "word_range": (1200, 1800)
+    },
+    "comparison": {
+        "name": "Comparison/Versus",
+        "description": "Side-by-side comparison - ideal for product/service comparisons",
+        "structure": [
+            ("intro", "What we're comparing and why it matters"),
+            ("overview_table", "Quick comparison table with key differences"),
+            ("detailed_comparison", "Category-by-category breakdown"),
+            ("pros_cons", "Pros and cons of each option"),
+            ("verdict", "Final recommendation based on use case"),
+            ("faq", "Common questions about choosing between options")
+        ],
+        "tone": "objective",
+        "heading_style": "versus",
+        "word_range": (1000, 1400)
+    },
+    "case_study": {
+        "name": "Case Study",
+        "description": "Real-world example format - great for demonstrating results",
+        "structure": [
+            ("overview", "Brief summary of the case and outcome"),
+            ("challenge", "The problem or situation that needed solving"),
+            ("approach", "The strategy or method used"),
+            ("implementation", "How it was executed"),
+            ("results", "Measurable outcomes and achievements"),
+            ("lessons_learned", "Key takeaways others can apply")
+        ],
+        "tone": "narrative",
+        "heading_style": "story",
+        "word_range": (900, 1300)
+    },
+    "qa_interview": {
+        "name": "Q&A / Expert Interview",
+        "description": "Question and answer format - feels personal and authoritative",
+        "structure": [
+            ("intro_context", "Set up who's being interviewed and why (can be fictional expert persona)"),
+            ("qa_pairs", "8-12 questions with detailed answers"),
+            ("key_takeaways", "Summary of the most important points"),
+            ("resources", "Where to learn more")
+        ],
+        "tone": "conversational",
+        "heading_style": "question",
+        "word_range": (1000, 1400)
+    },
+    "news_commentary": {
+        "name": "News Commentary",
+        "description": "Timely analysis of trends or news - positions as thought leader",
+        "structure": [
+            ("news_summary", "What happened or what's trending (brief factual summary)"),
+            ("context", "Background needed to understand the significance"),
+            ("analysis", "Expert interpretation of what this means"),
+            ("opinion", "Perspective on the implications"),
+            ("what_next", "Predictions or recommended actions")
+        ],
+        "tone": "journalistic",
+        "heading_style": "news",
+        "word_range": (800, 1100)
+    },
+    "ultimate_guide": {
+        "name": "Ultimate Guide",
+        "description": "Comprehensive resource - the definitive guide on a topic",
+        "structure": [
+            ("overview", "What this guide covers and who it's for"),
+            ("table_of_contents", "Quick navigation to sections"),
+            ("fundamentals", "Core concepts everyone needs to know"),
+            ("intermediate", "Building on the basics"),
+            ("advanced", "Expert-level insights"),
+            ("best_practices", "Do's and don'ts from experience"),
+            ("resources", "Tools, further reading, next steps"),
+            ("faq", "Comprehensive FAQ section")
+        ],
+        "tone": "comprehensive",
+        "heading_style": "chapter",
+        "word_range": (1500, 2500)
+    }
+}
+
+# Voice style configurations for genuine, human-like content
+VOICE_STYLES = {
+    "professional": {
+        "contractions": False,
+        "first_person": "we",
+        "sentence_complexity": "high",
+        "formality": "high",
+        "emoji_use": False
+    },
+    "conversational": {
+        "contractions": True,
+        "first_person": "I",
+        "sentence_complexity": "mixed",
+        "formality": "low",
+        "emoji_use": False
+    },
+    "expert": {
+        "contractions": False,
+        "first_person": "we",
+        "sentence_complexity": "high",
+        "formality": "medium",
+        "jargon_level": "high",
+        "emoji_use": False
+    },
+    "friendly": {
+        "contractions": True,
+        "first_person": "I",
+        "sentence_complexity": "low",
+        "formality": "low",
+        "emoji_use": True
+    }
+}
+
+# Human elements configuration for avoiding AI detection
+HUMAN_ELEMENTS = {
+    "rhetorical_questions": True,
+    "conversational_asides": True,
+    "opinion_markers": True,
+    "uncertainty_markers": True,
+    "anecdote_hints": True,
+    "transition_variety": True
+}
 
 
 class Default(WorkerEntrypoint):
@@ -315,9 +484,17 @@ class Default(WorkerEntrypoint):
         # Mark topic as used (with times_used increment)
         await self.mark_topic_used(topic.get("id"), website, supabase_url, supabase_key)
 
-        await self.update_website_schedule(website_id, website.get("days_between_posts", 3), supabase_url, supabase_key)
+        # Update schedule with time variation and format tracking
+        await self.update_website_schedule(
+            website_id,
+            website.get("days_between_posts", 3),
+            supabase_url,
+            supabase_key,
+            website=website,
+            content_format=article.get("content_format")
+        )
 
-        console.log(f"Successfully generated: {article.get('title')}")
+        console.log(f"Successfully generated: {article.get('title')} (format: {article.get('content_format', 'default')})")
         return True
 
     async def get_api_keys(self, website_id: str, supabase_url: str, supabase_key: str) -> Optional[dict]:
@@ -712,8 +889,10 @@ Return ONLY a JSON object (no markdown):
         return all_topics
 
     async def generate_article(self, topic: dict, website: dict, api_type: str, api_key: str) -> Optional[dict]:
-        """Generate article content using AI API."""
-        prompt = self.build_prompt(topic, website)
+        """Generate article content using AI API with dynamic format selection."""
+        # Select content format and build prompt
+        content_format = self.select_content_format(website, topic)
+        prompt = self.build_prompt(topic, website, content_format)
         system_prompt = website.get(f"system_prompt_{api_type}") or self.get_default_system_prompt(website)
 
         if api_type == "openai":
@@ -724,7 +903,14 @@ Return ONLY a JSON object (no markdown):
         if not content:
             return None
 
-        return self.parse_article(content, topic, website)
+        article = self.parse_article(content, topic, website)
+
+        # Track the content format used
+        if article:
+            article["content_format"] = content_format.get("key", "unknown")
+            article["voice_style"] = website.get("voice_style", "conversational")
+
+        return article
 
     async def call_openai(self, prompt: str, system_prompt: str, api_key: str) -> Optional[str]:
         """Call OpenAI API directly via HTTP."""
@@ -794,62 +980,221 @@ Return ONLY a JSON object (no markdown):
             console.log(f"Anthropic call failed: {str(e)}")
             return None
 
-    def build_prompt(self, topic: dict, website: dict) -> str:
-        """Build the content generation prompt with explicit formatting rules."""
+    # =============================================
+    # CONTENT FORMAT SELECTION & BUILDING
+    # =============================================
+
+    def select_content_format(self, website: dict, topic: dict) -> dict:
+        """Select a content format based on website config and randomization.
+
+        Avoids repeating the last few formats used for variety.
+        """
+        # Get enabled formats from website config (default: all formats)
+        enabled_formats = website.get("content_formats", list(CONTENT_FORMATS.keys()))
+
+        # Filter to only valid formats
+        valid_formats = [f for f in enabled_formats if f in CONTENT_FORMATS]
+        if not valid_formats:
+            valid_formats = list(CONTENT_FORMATS.keys())
+
+        # Get recent format history to avoid repetition
+        format_history = website.get("format_history", [])
+        recent_formats = format_history[-3:] if format_history else []
+
+        # Prefer formats not recently used
+        available_formats = [f for f in valid_formats if f not in recent_formats]
+        if not available_formats:
+            available_formats = valid_formats
+
+        # Random selection
+        selected_key = random.choice(available_formats)
+        selected_format = CONTENT_FORMATS[selected_key].copy()
+        selected_format["key"] = selected_key
+
+        console.log(f"Selected content format: {selected_format['name']}")
+        return selected_format
+
+    def _build_structure_instructions(self, content_format: dict, language: str) -> str:
+        """Build structure instructions based on the selected format."""
+        structure = content_format.get("structure", [])
+        word_range = content_format.get("word_range", (800, 1200))
+
+        instructions = []
+        instructions.append(f"TARGET WORD COUNT: {word_range[0]}-{word_range[1]} words\n")
+        instructions.append("REQUIRED SECTIONS:\n")
+
+        for i, (section_name, section_desc) in enumerate(structure, 1):
+            instructions.append(f"{i}. {section_name.upper().replace('_', ' ')}")
+            instructions.append(f"   {section_desc}\n")
+
+        return "\n".join(instructions)
+
+    def _get_heading_style_instructions(self, heading_style: str) -> str:
+        """Get heading style instructions based on format type."""
+        styles = {
+            "numbered": "Use numbered headings: '1. First Point', '2. Second Point', etc.",
+            "step": "Use step-based headings: 'Step 1: [Action]', 'Step 2: [Action]', etc.",
+            "descriptive": "Use descriptive headings that summarize the section content",
+            "versus": "Use comparison headings: '[Option A] vs [Option B]', 'Feature Comparison', etc.",
+            "story": "Use narrative headings: 'The Challenge', 'The Approach', 'The Results', etc.",
+            "question": "Use question headings: 'What is...?', 'How does...?', 'Why should...?'",
+            "news": "Use journalistic headings: 'What Happened', 'Why It Matters', 'What's Next'",
+            "chapter": "Use chapter-style headings: 'Chapter 1: Getting Started', or 'Part 1: Fundamentals'"
+        }
+        return styles.get(heading_style, "Use clear, descriptive headings")
+
+    def _get_tone_instructions(self, tone: str, voice_style: str) -> str:
+        """Get tone and voice instructions based on format and website config."""
+        voice_config = VOICE_STYLES.get(voice_style, VOICE_STYLES["conversational"])
+
+        instructions = []
+
+        # Base tone
+        tone_mapping = {
+            "energetic": "Write with energy and enthusiasm. Use active verbs and exciting language.",
+            "instructional": "Write clearly and didactically. Guide the reader step by step.",
+            "analytical": "Write thoughtfully and thoroughly. Support claims with evidence and reasoning.",
+            "objective": "Write balanced and fair. Present multiple perspectives before concluding.",
+            "narrative": "Write engagingly like telling a story. Use vivid details and build tension.",
+            "conversational": "Write like you're talking to a friend. Be warm and approachable.",
+            "journalistic": "Write factually and concisely. Lead with the most important information.",
+            "comprehensive": "Write thoroughly and authoritatively. Cover all aspects of the topic."
+        }
+        instructions.append(tone_mapping.get(tone, "Write naturally and engagingly."))
+
+        # Voice specifics
+        if voice_config.get("contractions"):
+            instructions.append("Use contractions naturally (don't, won't, I'm, you're, it's).")
+        else:
+            instructions.append("Avoid contractions for a more formal tone.")
+
+        first_person = voice_config.get("first_person", "we")
+        if first_person == "I":
+            instructions.append("Write in first person singular (I, my, me) as if sharing personal experience.")
+        else:
+            instructions.append("Write in first person plural (we, our, us) representing the team/company.")
+
+        return "\n".join(instructions)
+
+    def _get_genuineness_instructions(self, website: dict) -> str:
+        """Get instructions for human-like, genuine writing that avoids AI detection."""
+        human_config = website.get("human_elements", HUMAN_ELEMENTS)
+
+        instructions = [
+            "\nWRITING STYLE FOR AUTHENTICITY (CRITICAL - Read Carefully):",
+            "",
+            "To sound human and avoid robotic AI patterns:"
+        ]
+
+        if human_config.get("rhetorical_questions", True):
+            instructions.append("- Ask rhetorical questions occasionally: 'But what does this actually mean?', 'Sound familiar?'")
+
+        if human_config.get("conversational_asides", True):
+            instructions.append("- Include conversational asides: 'Here's the thing...', 'Now,', 'Look,', 'Honestly,'")
+
+        if human_config.get("opinion_markers", True):
+            instructions.append("- Share opinions naturally: 'In my experience...', 'I've found that...', 'What I like about...'")
+
+        if human_config.get("uncertainty_markers", True):
+            instructions.append("- Use natural uncertainty: 'It seems', 'In most cases', 'Typically', 'Often'")
+
+        if human_config.get("anecdote_hints", True):
+            instructions.append("- Reference experiences: 'I remember when...', 'A common situation is...', 'Many people find...'")
+
+        instructions.extend([
+            "",
+            "ANTI-AI-DETECTION RULES:",
+            "- Vary paragraph length: mix short (1-2 sentences) with longer paragraphs",
+            "- DON'T start multiple sentences with 'The', 'This', 'It', or 'There'",
+            "- DON'T use 'Additionally', 'Furthermore', 'Moreover' repeatedly",
+            "- Use natural keyword density (1-2%) - don't force keywords",
+            "- Mix sentence lengths: some short and punchy, others more complex",
+            "- Include occasional tangents or related thoughts",
+            "- Don't be exhaustively comprehensive - real writers skip obvious things",
+            "- Vary your transitions: 'That said,', 'On the flip side,', 'Here's where it gets interesting,'"
+        ])
+
+        return "\n".join(instructions)
+
+    def build_prompt(self, topic: dict, website: dict, content_format: dict = None) -> str:
+        """Build the content generation prompt with dynamic format and genuineness."""
         keywords = ", ".join(topic.get("keywords", [])) if topic.get("keywords") else ""
 
-        return f"""Write a comprehensive, SEO-optimized blog article.
+        # Select format if not provided
+        if not content_format:
+            content_format = self.select_content_format(website, topic)
+
+        # Get voice style
+        voice_style = website.get("voice_style", "conversational")
+
+        # Build all the dynamic sections
+        structure_instructions = self._build_structure_instructions(
+            content_format,
+            website.get('language', 'en-US')
+        )
+        heading_instructions = self._get_heading_style_instructions(content_format.get("heading_style", "descriptive"))
+        tone_instructions = self._get_tone_instructions(content_format.get("tone", "conversational"), voice_style)
+        genuineness_instructions = self._get_genuineness_instructions(website)
+
+        return f"""Write a {content_format['name']} style blog article.
 
 TOPIC: {topic.get('title')}
 TARGET KEYWORDS: {keywords}
 LANGUAGE: {website.get('language', 'en-US')}
 CATEGORY: {topic.get('category', 'general')}
+FORMAT: {content_format['name']} - {content_format.get('description', '')}
 
-REQUIRED STRUCTURE:
+{structure_instructions}
 
-1. TL;DR SUMMARY (50-75 words):
-   Format: <div class="tldr"><strong>TL;DR:</strong> [Summary]</div>
+HEADING STYLE:
+{heading_instructions}
 
-2. INTRODUCTION (100-150 words):
-   - Hook with compelling insight or statistic
-   - Include primary keyword naturally
-
-3. MAIN CONTENT (800-1200 words):
-   - Use <h2> for main section headings
-   - Use <h3> for subsections
-   - Include statistics with sources where applicable
-   - Include practical tips and actionable advice
-   - Use <ul> and <li> for lists
-
-4. FAQ SECTION:
-   - Add heading: <h2>Veelgestelde Vragen</h2> (or FAQ in the article language)
-   - Format each Q&A as:
-     <div class="faq-item"><strong>Q: [Question]?</strong><p>A: [Answer in 2-3 sentences]</p></div>
-   - Include 3-5 relevant questions
-
-5. CONCLUSION (80-100 words):
-   - Summarize key points
-   - Clear call-to-action
+TONE & VOICE:
+{tone_instructions}
+{genuineness_instructions}
 
 CRITICAL FORMATTING RULES:
-- Output ONLY the article content - no wrapper
+- Output ONLY the article content - no wrapper or meta text
 - Do NOT wrap in markdown code blocks (no ```)
 - Do NOT include <!DOCTYPE>, <html>, <head>, <body>, <meta>, or <title> tags
 - Do NOT start with "Here is the article" or any meta-commentary
-- Do NOT add HTML comments at the end
-- Use semantic HTML tags: <h2>, <h3>, <p>, <ul>, <li>, <div>, <strong>
-- Start DIRECTLY with the <div class="tldr"> section
+- Do NOT add HTML comments
+- Use semantic HTML tags: <h2>, <h3>, <p>, <ul>, <li>, <ol>, <div>, <strong>, <em>
+- Start DIRECTLY with the first section content
 
 BEGIN THE ARTICLE NOW:"""
 
     def get_default_system_prompt(self, website: dict) -> str:
-        """Get default system prompt for content generation."""
+        """Get default system prompt with genuineness instructions."""
+        voice_style = website.get("voice_style", "conversational")
+        voice_config = VOICE_STYLES.get(voice_style, VOICE_STYLES["conversational"])
+
+        # Build personality based on voice style
+        if voice_style == "professional":
+            personality = "You write with authority and precision, using formal language."
+        elif voice_style == "expert":
+            personality = "You write as a subject matter expert, comfortable with technical details."
+        elif voice_style == "friendly":
+            personality = "You write like a helpful friend, warm and encouraging."
+        else:  # conversational
+            personality = "You write naturally like a knowledgeable colleague sharing insights."
+
         return f"""You are an expert content writer for {website.get('name', 'a professional website')}.
-Write engaging, informative, and SEO-optimized blog articles.
-Focus on providing value to readers while incorporating relevant keywords naturally.
-Your content should be well-structured, easy to read, and actionable.
-Always include practical examples and real-world applications where relevant.
-Output clean semantic HTML only - never wrap in code blocks or include document structure tags."""
+{personality}
+
+Your content philosophy:
+- Provide genuine value - don't just fill space
+- Write for humans first, search engines second
+- Be specific rather than generic
+- Share insights that come from real experience
+- Engage readers with your unique perspective
+
+Writing rules:
+- Output clean semantic HTML only
+- Never wrap content in code blocks
+- Never include document structure tags (html, head, body)
+- Never add meta-commentary about the article
+- Vary your sentence structure and paragraph lengths naturally"""
 
     def clean_content(self, content: str, title: str) -> str:
         """Clean AI output: remove code blocks, document structure, meta-commentary."""
@@ -1146,14 +1491,117 @@ Output clean semantic HTML only - never wrap in code blocks or include document 
             self._make_options("PATCH", headers, json.dumps(data))
         )
 
-    async def update_website_schedule(self, website_id: str, days: int, supabase_url: str, supabase_key: str):
-        """Update website schedule after generation."""
-        next_scheduled = datetime.now() + timedelta(days=days)
+    def calculate_next_schedule(self, website: dict) -> datetime:
+        """Calculate next posting time with time variation support.
 
-        data = {
-            "last_generated_at": datetime.now().isoformat(),
-            "next_scheduled_at": next_scheduled.isoformat(),
-        }
+        Supports multiple scheduling modes:
+        - fixed: Same time every post (original behavior)
+        - window: Random time within a daily window
+        - random: Fully randomized times within constraints
+        """
+        mode = website.get("time_variation_mode", "fixed")
+        min_hours = website.get("min_hours_between_posts", 24)
+        max_hours = website.get("max_hours_between_posts", 96)
+        preferred_days = website.get("preferred_days", ["monday", "tuesday", "wednesday", "thursday", "friday"])
+        window_start = website.get("posting_window_start", "08:00")
+        window_end = website.get("posting_window_end", "18:00")
+        last_hour = website.get("last_posting_hour")
+
+        now = datetime.now()
+
+        if mode == "fixed":
+            # Original behavior - fixed interval
+            days = website.get("days_between_posts", 3)
+            preferred_time = website.get("preferred_time", "09:00:00")
+            next_date = now + timedelta(days=days)
+
+            # Parse preferred time
+            try:
+                time_parts = preferred_time.split(":")
+                hour = int(time_parts[0])
+                minute = int(time_parts[1]) if len(time_parts) > 1 else 0
+                return next_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            except:
+                return next_date
+
+        elif mode == "window":
+            # Random time within daily window
+            hours_offset = random.randint(min_hours, max_hours)
+            next_date = now + timedelta(hours=hours_offset)
+
+            # Parse window times
+            try:
+                start_hour = int(window_start.split(":")[0])
+                end_hour = int(window_end.split(":")[0])
+            except:
+                start_hour, end_hour = 8, 18
+
+            # Ensure it falls on a preferred day (if configured)
+            if preferred_days:
+                day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                attempts = 0
+                while next_date.strftime("%A").lower() not in preferred_days and attempts < 7:
+                    next_date += timedelta(days=1)
+                    attempts += 1
+
+            # Random time within window, avoiding same hour as last time
+            available_hours = [h for h in range(start_hour, end_hour + 1)]
+            if last_hour is not None and last_hour in available_hours and len(available_hours) > 1:
+                available_hours.remove(last_hour)
+
+            random_hour = random.choice(available_hours) if available_hours else random.randint(start_hour, end_hour)
+            random_minute = random.randint(0, 59)
+
+            return next_date.replace(hour=random_hour, minute=random_minute, second=0, microsecond=0)
+
+        elif mode == "random":
+            # Fully random within constraints
+            hours_offset = random.randint(min_hours, max_hours)
+            random_hour = random.randint(6, 22)  # Reasonable hours (6 AM - 10 PM)
+            random_minute = random.randint(0, 59)
+
+            next_date = now + timedelta(hours=hours_offset)
+            return next_date.replace(hour=random_hour, minute=random_minute, second=0, microsecond=0)
+
+        # Fallback - 3 days from now
+        return now + timedelta(days=3)
+
+    async def update_website_schedule(
+        self,
+        website_id: str,
+        days: int,
+        supabase_url: str,
+        supabase_key: str,
+        website: dict = None,
+        content_format: str = None
+    ):
+        """Update website schedule after generation with time variation and format tracking."""
+        now = datetime.now()
+
+        # Calculate next schedule with variation if website config provided
+        if website:
+            next_scheduled = self.calculate_next_schedule(website)
+            current_hour = now.hour
+
+            # Update format history (keep last 10)
+            format_history = website.get("format_history", [])
+            if content_format:
+                format_history.append(content_format)
+                format_history = format_history[-10:]  # Keep last 10
+
+            data = {
+                "last_generated_at": now.isoformat(),
+                "next_scheduled_at": next_scheduled.isoformat(),
+                "last_posting_hour": current_hour,
+                "format_history": format_history
+            }
+        else:
+            # Fallback to simple scheduling
+            next_scheduled = now + timedelta(days=days)
+            data = {
+                "last_generated_at": now.isoformat(),
+                "next_scheduled_at": next_scheduled.isoformat(),
+            }
 
         headers = {
             "apikey": supabase_key,
@@ -1165,6 +1613,8 @@ Output clean semantic HTML only - never wrap in code blocks or include document 
             f"{supabase_url}/rest/v1/websites?id=eq.{website_id}",
             self._make_options("PATCH", headers, json.dumps(data))
         )
+
+        console.log(f"Next generation scheduled for: {next_scheduled.isoformat()}")
 
     # =============================================
     # WEBSITE SCANNING FUNCTIONS

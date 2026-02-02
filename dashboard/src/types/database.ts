@@ -38,8 +38,48 @@ export interface Website {
   auto_scan_enabled: boolean;
   scan_frequency_days: number;
   google_search_enabled: boolean;
+  // Content format settings
+  content_formats: ContentFormatType[];
+  format_history: string[];
+  voice_style: VoiceStyleType;
+  human_elements: HumanElements;
+  // Time variation settings
+  time_variation_mode: TimeVariationMode;
+  posting_window_start: string;
+  posting_window_end: string;
+  preferred_days: string[];
+  min_hours_between_posts: number;
+  max_hours_between_posts: number;
+  last_posting_hour: number | null;
   created_at: string;
   updated_at: string;
+}
+
+// Content format types (matches worker/src/entry.py CONTENT_FORMATS)
+export type ContentFormatType =
+  | "listicle"
+  | "how_to_guide"
+  | "deep_dive"
+  | "comparison"
+  | "case_study"
+  | "qa_interview"
+  | "news_commentary"
+  | "ultimate_guide";
+
+// Voice style types (matches worker/src/entry.py VOICE_STYLES)
+export type VoiceStyleType = "professional" | "conversational" | "expert" | "friendly";
+
+// Time variation modes
+export type TimeVariationMode = "fixed" | "window" | "random";
+
+// Human elements for anti-AI detection
+export interface HumanElements {
+  rhetorical_questions: boolean;
+  conversational_asides: boolean;
+  opinion_markers: boolean;
+  uncertainty_markers: boolean;
+  anecdote_hints: boolean;
+  transition_variety: boolean;
 }
 
 export interface SeoConfig {
@@ -103,6 +143,10 @@ export interface Topic {
   original_title: string | null;
   notes: string | null;
   discovery_context: DiscoveryContext | null;
+  // Content format hints
+  format_type: ContentFormatType | null;
+  trending_reason: string | null;
+  timeliness: "evergreen" | "seasonal" | "news" | "trending";
   created_at: string;
   updated_at: string;
 }
@@ -156,6 +200,9 @@ export interface GenerationLog {
   error_details: Record<string, unknown> | null;
   retry_count: number;
   target_article_id: string | null;
+  // Content format tracking
+  content_format: ContentFormatType | null;
+  voice_style: VoiceStyleType | null;
   started_at: string;
   completed_at: string | null;
   created_at: string;
