@@ -22,7 +22,24 @@ export async function POST(request: Request) {
     }
 
     // Get the correct price ID
-    const priceId = getPriceId(plan, withGeo ?? true);
+    const priceId = getPriceId(plan, withGeo ?? false);
+
+    // Validate that we have a real Stripe price ID (not a fallback placeholder)
+    // Fallback placeholders are: price_starter_base, price_pro_geo, etc.
+    const fallbackPlaceholders = [
+      "price_starter_base", "price_starter_geo",
+      "price_pro_base", "price_pro_geo",
+      "price_business_base", "price_business_geo",
+      "price_xxxxx"
+    ];
+    if (!priceId || fallbackPlaceholders.includes(priceId)) {
+      console.error("Invalid Stripe price ID:", priceId, "for plan:", plan, "withGeo:", withGeo);
+      return NextResponse.json(
+        { error: `Stripe price not configured for ${plan} plan. Please contact support.` },
+        { status: 500 }
+      );
+    }
+
     const origin = request.headers.get("origin") || "https://indexyourniche.com";
 
     // Check if user is authenticated
@@ -140,8 +157,10 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error("Checkout error:", error);
+    // Return more specific error message for debugging
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to create checkout session" },
+      { error: `Failed to create checkout session: ${errorMessage}` },
       { status: 500 }
     );
   }

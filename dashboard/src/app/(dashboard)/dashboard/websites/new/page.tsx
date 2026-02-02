@@ -52,10 +52,9 @@ export default function NewWebsitePage() {
 
   // Get plan info from URL params (passed from signup)
   const planKey = searchParams.get("plan") || "starter";
-  const withGeo = searchParams.get("geo") === "true";
+  // Default GEO to true (only false if explicitly set to "false")
+  const withGeo = searchParams.get("geo") !== "false";
   const checkoutSuccess = searchParams.get("checkout") === "success";
-  const planDetails = PLAN_DETAILS[planKey] || PLAN_DETAILS.starter;
-  const displayPrice = withGeo ? planDetails.geoPrice : planDetails.price;
 
   // Start at checkout step if coming back from successful payment
   const [step, setStep] = useState<Step>(checkoutSuccess ? "review" : "basic");
@@ -613,52 +612,39 @@ function ArticleJsonLd({ article }) {
       dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
     />
   )
-}`;
+}
 
-  const seoTips = [
-    {
-      title: "URL Structure",
-      tips: [
-        "Use clean URLs: /blog/your-article-slug",
-        "Keep slugs short, descriptive, and keyword-rich",
-        "Use hyphens, not underscores",
-      ],
-    },
-    {
-      title: "Meta Tags",
-      tips: [
-        "Unique title tag (50-60 characters)",
-        "Meta description (150-160 characters)",
-        "Open Graph tags for social sharing",
-      ],
-    },
-    {
-      title: "Content Structure",
-      tips: [
-        "Use semantic HTML (article, header, main, section)",
-        "One H1 per page (the article title)",
-        "Logical heading hierarchy (H2, H3, H4)",
-        "Include the TL;DR summary for AI search engines",
-      ],
-    },
-    {
-      title: "Performance",
-      tips: [
-        "Lazy load images below the fold",
-        "Use next/image or similar for optimization",
-        "Implement ISR (Incremental Static Regeneration)",
-      ],
-    },
-    {
-      title: "Sitemap & Internal Linking",
-      tips: [
-        "Add blog URLs to your sitemap.xml",
-        "Link between related articles",
-        "Use descriptive anchor text",
-        "The system stores internal_links for each article",
-      ],
-    },
-  ];
+// =============================================================================
+// SEO BEST PRACTICES FOR FINDABILITY
+// =============================================================================
+// Follow these guidelines to maximize your blog's search visibility:
+
+// URL STRUCTURE
+// - Use clean URLs: /blog/your-article-slug
+// - Keep slugs short, descriptive, and keyword-rich
+// - Use hyphens, not underscores
+
+// META TAGS
+// - Unique title tag (50-60 characters)
+// - Meta description (150-160 characters)
+// - Open Graph tags for social sharing
+
+// CONTENT STRUCTURE
+// - Use semantic HTML (article, header, main, section)
+// - One H1 per page (the article title)
+// - Logical heading hierarchy (H2, H3, H4)
+// - Include the TL;DR summary for AI search engines
+
+// PERFORMANCE
+// - Lazy load images below the fold
+// - Use next/image or similar for optimization
+// - Implement ISR (Incremental Static Regeneration)
+
+// SITEMAP & INTERNAL LINKING
+// - Add blog URLs to your sitemap.xml
+// - Link between related articles
+// - Use descriptive anchor text
+// - The system stores internal_links for each article`;
 
   const copyFrontendGuide = async () => {
     await navigator.clipboard.writeText(frontendGuide);
@@ -967,26 +953,6 @@ function ArticleJsonLd({ article }) {
                     <code>{frontendGuide}</code>
                   </pre>
                 </div>
-
-                {/* SEO Best Practices */}
-                <div className="border-t pt-6 mt-6">
-                  <h3 className="font-semibold mb-4">SEO Best Practices for Findability</h3>
-                  <div className="grid gap-4">
-                    {seoTips.map((section) => (
-                      <div key={section.title} className="rounded-md border p-4">
-                        <h4 className="font-medium text-sm mb-2">{section.title}</h4>
-                        <ul className="text-sm text-muted-foreground space-y-1">
-                          {section.tips.map((tip, i) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <span className="text-emerald-600 mt-0.5">•</span>
-                              {tip}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </>
             )}
 
@@ -1083,44 +1049,107 @@ function ArticleJsonLd({ article }) {
                       </div>
                     )}
 
-                    {/* Plan Selection Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {Object.entries(PLAN_DETAILS).map(([key, plan]) => {
-                        const isSelected = selectedPlan === key;
-                        const price = enableGeo ? plan.geoPrice : plan.price;
-                        return (
-                          <div
-                            key={key}
-                            onClick={() => setSelectedPlan(key)}
-                            className={`relative rounded-lg border-2 p-4 cursor-pointer transition-all ${
-                              isSelected
-                                ? "border-primary bg-primary/5 shadow-md"
-                                : "border-muted hover:border-primary/50"
-                            }`}
-                          >
-                            {key === "pro" && (
-                              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-primary text-primary-foreground text-xs font-medium rounded-full">
-                                Popular
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
-                                isSelected ? "border-primary" : "border-muted-foreground"
-                              }`}>
-                                {isSelected && <div className="h-2 w-2 rounded-full bg-primary" />}
-                              </div>
-                              <h4 className="font-semibold">{plan.name}</h4>
-                            </div>
-                            <div className="flex items-baseline gap-1 mb-3">
-                              <span className="text-2xl font-bold">€{price}</span>
-                              <span className="text-sm text-muted-foreground">/mo</span>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {plan.articles} articles/month
-                            </p>
+                    {/* Featured Business Plan */}
+                    <div
+                      onClick={() => setSelectedPlan("business")}
+                      className={`relative rounded-xl border-2 p-6 cursor-pointer transition-all ${
+                        selectedPlan === "business"
+                          ? "border-primary bg-gradient-to-r from-primary/10 via-primary/5 to-purple-500/10 shadow-lg ring-2 ring-primary/20"
+                          : "border-primary/50 bg-gradient-to-r from-primary/5 to-purple-500/5 hover:border-primary hover:shadow-md"
+                      }`}
+                    >
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-primary to-purple-600 text-primary-foreground text-sm font-semibold rounded-full shadow-md">
+                        ⭐ Best Value
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                            selectedPlan === "business" ? "border-primary" : "border-muted-foreground"
+                          }`}>
+                            {selectedPlan === "business" && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
                           </div>
-                        );
-                      })}
+                          <div>
+                            <h4 className="text-xl font-bold">Business</h4>
+                            <p className="text-sm text-muted-foreground">For serious growth</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-bold">€{enableGeo ? PLAN_DETAILS.business.geoPrice : PLAN_DETAILS.business.price}</span>
+                            <span className="text-muted-foreground">/mo</span>
+                          </div>
+                          <p className="text-sm text-primary font-medium">{PLAN_DETAILS.business.articles} articles/month</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
+                          <Check className="h-3 w-3 mr-1" /> 10 websites
+                        </span>
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
+                          <Check className="h-3 w-3 mr-1" /> Priority support
+                        </span>
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
+                          <Check className="h-3 w-3 mr-1" /> Best €/article
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Starter and Pro Plans Side by Side */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Starter Plan */}
+                      <div
+                        onClick={() => setSelectedPlan("starter")}
+                        className={`relative rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                          selectedPlan === "starter"
+                            ? "border-primary bg-primary/5 shadow-md"
+                            : "border-muted hover:border-primary/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                            selectedPlan === "starter" ? "border-primary" : "border-muted-foreground"
+                          }`}>
+                            {selectedPlan === "starter" && <div className="h-2 w-2 rounded-full bg-primary" />}
+                          </div>
+                          <h4 className="font-semibold">Starter</h4>
+                        </div>
+                        <div className="flex items-baseline gap-1 mb-3">
+                          <span className="text-2xl font-bold">€{enableGeo ? PLAN_DETAILS.starter.geoPrice : PLAN_DETAILS.starter.price}</span>
+                          <span className="text-sm text-muted-foreground">/mo</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {PLAN_DETAILS.starter.articles} articles/month • 1 website
+                        </p>
+                      </div>
+
+                      {/* Pro Plan */}
+                      <div
+                        onClick={() => setSelectedPlan("pro")}
+                        className={`relative rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                          selectedPlan === "pro"
+                            ? "border-primary bg-primary/5 shadow-md"
+                            : "border-muted hover:border-primary/50"
+                        }`}
+                      >
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-muted text-muted-foreground text-xs font-medium rounded-full">
+                          Popular
+                        </div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                            selectedPlan === "pro" ? "border-primary" : "border-muted-foreground"
+                          }`}>
+                            {selectedPlan === "pro" && <div className="h-2 w-2 rounded-full bg-primary" />}
+                          </div>
+                          <h4 className="font-semibold">Pro</h4>
+                        </div>
+                        <div className="flex items-baseline gap-1 mb-3">
+                          <span className="text-2xl font-bold">€{enableGeo ? PLAN_DETAILS.pro.geoPrice : PLAN_DETAILS.pro.price}</span>
+                          <span className="text-sm text-muted-foreground">/mo</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {PLAN_DETAILS.pro.articles} articles/month • 3 websites
+                        </p>
+                      </div>
                     </div>
 
                     {/* GEO Optimization Toggle */}
@@ -1162,6 +1191,14 @@ function ArticleJsonLd({ article }) {
                           <span className="text-muted-foreground">/month</span>
                         </div>
                       </div>
+
+                      {/* Checkout Error Display */}
+                      {error && (
+                        <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive mb-4">
+                          {error}
+                        </div>
+                      )}
+
                       <Button
                         onClick={handleCheckout}
                         disabled={checkoutLoading}
