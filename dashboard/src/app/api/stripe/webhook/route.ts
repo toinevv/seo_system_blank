@@ -1,8 +1,41 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { stripe } from "@/lib/stripe";
+import { stripe, getPlanFromPriceId } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/server";
 import Stripe from "stripe";
+
+// Helper to extract base plan and geo status from planKey
+function extractPlanInfo(planKey: string | null): { plan: string | null; hasGeo: boolean } {
+  if (!planKey) return { plan: null, hasGeo: false };
+  const parts = planKey.split("_");
+  return {
+    plan: parts[0], // "starter", "pro", or "business"
+    hasGeo: parts[1] === "geo",
+  };
+}
+
+// Helper to update user's subscription in database
+async function updateUserSubscription(
+  adminClient: ReturnType<typeof createAdminClient>,
+  userId: string,
+  subscription: Stripe.Subscription
+) {
+  const priceId = subscription.items.data[0]?.price.id;
+  const planKey = priceId ? getPlanFromPriceId(priceId) : null;
+  const { plan, hasGeo } = extractPlanInfo(planKey);
+
+  await adminClient
+    .from("profiles")
+    .update({
+      subscription_plan: plan,
+      subscription_status: subscription.status,
+      subscription_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      has_geo_optimization: hasGeo,
+    })
+    .eq("id", userId);
+
+  console.log(`Updated subscription for user ${userId}: plan=${plan}, status=${subscription.status}, hasGeo=${hasGeo}`);
+}
 
 export async function POST(request: Request) {
   const body = await request.text();

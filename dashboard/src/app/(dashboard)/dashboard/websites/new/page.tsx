@@ -37,7 +37,7 @@ const extractSupabaseProjectId = (url: string): string | null => {
   return match ? match[1] : null;
 };
 
-type Step = "basic" | "database" | "frontend" | "checkout" | "review";
+type Step = "basic" | "checkout" | "database" | "review";
 
 const PLAN_DETAILS: Record<string, { name: string; price: number; geoPrice: number; articles: number }> = {
   starter: { name: "Starter", price: 30, geoPrice: 35, articles: 3 },
@@ -56,13 +56,12 @@ export default function NewWebsitePage() {
   const withGeo = searchParams.get("geo") !== "false";
   const checkoutSuccess = searchParams.get("checkout") === "success";
 
-  // Start at checkout step if coming back from successful payment
-  const [step, setStep] = useState<Step>(checkoutSuccess ? "review" : "basic");
+  // Start at database step if coming back from successful payment (checkout is now step 2)
+  const [step, setStep] = useState<Step>(checkoutSuccess ? "database" : "basic");
   const [loading, setLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sqlCopied, setSqlCopied] = useState(false);
-  const [frontendCopied, setFrontendCopied] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -79,6 +78,10 @@ export default function NewWebsitePage() {
   const [selectedPlan, setSelectedPlan] = useState<string>(planKey);
   const [enableGeo, setEnableGeo] = useState<boolean>(withGeo);
   const [skippedPayment, setSkippedPayment] = useState(false);
+
+  // Subscription status (check if user already has active subscription)
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [checkingSubscription, setCheckingSubscription] = useState(true);
 
   // FOMO pop-up state
   const [showFomoPopup, setShowFomoPopup] = useState(false);
@@ -120,6 +123,37 @@ export default function NewWebsitePage() {
   const updateField = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  // Check if user already has an active subscription
+  useEffect(() => {
+    const checkSubscription = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setCheckingSubscription(false);
+          return;
+        }
+
+        // Check for active subscription in subscriptions table
+        const { data: subscription } = await supabase
+          .from("subscriptions")
+          .select("status")
+          .eq("user_id", user.id)
+          .eq("status", "active")
+          .single();
+
+        if (subscription) {
+          setHasActiveSubscription(true);
+        }
+      } catch (err) {
+        console.error("Failed to check subscription:", err);
+      } finally {
+        setCheckingSubscription(false);
+      }
+    };
+
+    checkSubscription();
+  }, [supabase]);
 
   // Restore form data from localStorage after returning from checkout
   useEffect(() => {
@@ -212,9 +246,14 @@ export default function NewWebsitePage() {
 
   // Handle step navigation with preview scan trigger
   const handleNextStep = (nextStep: Step) => {
-    // When moving from basic to database, trigger preview scan
-    if (step === "basic" && nextStep === "database" && formData.domain) {
+    // When moving from basic to checkout, trigger preview scan
+    if (step === "basic" && nextStep === "checkout" && formData.domain) {
       triggerPreviewScan(formData.domain);
+    }
+    // Skip checkout step if user already has active subscription
+    if (nextStep === "checkout" && hasActiveSubscription) {
+      setStep("database");
+      return;
     }
     setStep(nextStep);
   };
@@ -300,9 +339,8 @@ export default function NewWebsitePage() {
 
   const steps: { key: Step; title: string; description: string }[] = [
     { key: "basic", title: "Basic Info", description: "Website name and settings" },
-    { key: "database", title: "Database Setup", description: "Connect and configure your database" },
-    { key: "frontend", title: "Frontend Guide", description: "How to display your blog" },
     { key: "checkout", title: "Subscribe", description: "Activate your subscription" },
+    { key: "database", title: "Database Setup", description: "Connect your database" },
     { key: "review", title: "Review", description: "Confirm and create" },
   ];
 
@@ -311,12 +349,10 @@ export default function NewWebsitePage() {
     switch (step) {
       case "basic":
         return formData.name && formData.domain && formData.product_id;
+      case "checkout":
+        return checkoutSuccess || skippedPayment || hasActiveSubscription;
       case "database":
         return formData.target_supabase_url && formData.target_supabase_service_key;
-      case "frontend":
-        return true; // Guide is informational
-      case "checkout":
-        return checkoutSuccess || skippedPayment; // Can proceed after payment OR skip
       default:
         return true;
     }
@@ -496,160 +532,6 @@ GRANT ALL ON public.blog_articles TO service_role;`;
     await navigator.clipboard.writeText(databaseSql);
     setSqlCopied(true);
     setTimeout(() => setSqlCopied(false), 2000);
-  };
-
-  // Frontend implementation guide
-  const frontendGuide = `// =============================================================================
-// BLOG FRONTEND IMPLEMENTATION GUIDE
-// =============================================================================
-// This guide shows you how to integrate the blog system into your website.
-// Examples are in Next.js/React but the concepts apply to any framework.
-
-// -----------------------------------------------------------------------------
-// 1. SUPABASE CLIENT SETUP (lib/supabase.ts)
-// -----------------------------------------------------------------------------
-import { createClient } from '@supabase/supabase-js'
-
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-// -----------------------------------------------------------------------------
-// 2. FETCH ARTICLES FOR BLOG LISTING PAGE (app/blog/page.tsx)
-// -----------------------------------------------------------------------------
-export async function getBlogArticles() {
-  const { data: articles } = await supabase
-    .from('blog_articles')
-    .select('slug, title, excerpt, published_at, cover_image_url, category, read_time, author')
-    .eq('status', 'published')
-    .eq('product_id', '${formData.product_id || "YOUR_PRODUCT_ID"}')
-    .order('published_at', { ascending: false })
-
-  return articles || []
-}
-
-// -----------------------------------------------------------------------------
-// 3. FETCH SINGLE ARTICLE BY SLUG (app/blog/[slug]/page.tsx)
-// -----------------------------------------------------------------------------
-export async function getArticleBySlug(slug: string) {
-  const { data: article } = await supabase
-    .from('blog_articles')
-    .select('*')
-    .eq('slug', slug)
-    .eq('product_id', '${formData.product_id || "YOUR_PRODUCT_ID"}')
-    .eq('status', 'published')
-    .single()
-
-  return article
-}
-
-// -----------------------------------------------------------------------------
-// 4. GENERATE STATIC PATHS FOR ALL ARTICLES (for SSG)
-// -----------------------------------------------------------------------------
-export async function generateStaticParams() {
-  const { data: articles } = await supabase
-    .from('blog_articles')
-    .select('slug')
-    .eq('product_id', '${formData.product_id || "YOUR_PRODUCT_ID"}')
-    .eq('status', 'published')
-
-  return (articles || []).map((article) => ({ slug: article.slug }))
-}
-
-// -----------------------------------------------------------------------------
-// 5. SEO METADATA (app/blog/[slug]/page.tsx)
-// -----------------------------------------------------------------------------
-export async function generateMetadata({ params }) {
-  const article = await getArticleBySlug(params.slug)
-  if (!article) return {}
-
-  return {
-    title: article.title,
-    description: article.meta_description || article.excerpt,
-    openGraph: {
-      title: article.title,
-      description: article.meta_description,
-      images: article.cover_image_url ? [article.cover_image_url] : [],
-      type: 'article',
-      publishedTime: article.published_at,
-      authors: [article.author],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: article.title,
-      description: article.meta_description,
-      images: article.cover_image_url ? [article.cover_image_url] : [],
-    },
-  }
-}
-
-// -----------------------------------------------------------------------------
-// 6. JSON-LD STRUCTURED DATA (for rich search results)
-// -----------------------------------------------------------------------------
-function ArticleJsonLd({ article }) {
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Article',
-    headline: article.title,
-    description: article.meta_description,
-    image: article.cover_image_url,
-    datePublished: article.published_at,
-    dateModified: article.updated_at,
-    author: {
-      '@type': 'Person',
-      name: article.author,
-    },
-    // Use FAQ schema if available (GEO optimized)
-    ...(article.faq_schema && Object.keys(article.faq_schema).length > 0
-      ? { mainEntity: article.faq_schema }
-      : {}),
-  }
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-    />
-  )
-}
-
-// =============================================================================
-// SEO BEST PRACTICES FOR FINDABILITY
-// =============================================================================
-// Follow these guidelines to maximize your blog's search visibility:
-
-// URL STRUCTURE
-// - Use clean URLs: /blog/your-article-slug
-// - Keep slugs short, descriptive, and keyword-rich
-// - Use hyphens, not underscores
-
-// META TAGS
-// - Unique title tag (50-60 characters)
-// - Meta description (150-160 characters)
-// - Open Graph tags for social sharing
-
-// CONTENT STRUCTURE
-// - Use semantic HTML (article, header, main, section)
-// - One H1 per page (the article title)
-// - Logical heading hierarchy (H2, H3, H4)
-// - Include the TL;DR summary for AI search engines
-
-// PERFORMANCE
-// - Lazy load images below the fold
-// - Use next/image or similar for optimization
-// - Implement ISR (Incremental Static Regeneration)
-
-// SITEMAP & INTERNAL LINKING
-// - Add blog URLs to your sitemap.xml
-// - Link between related articles
-// - Use descriptive anchor text
-// - The system stores internal_links for each article`;
-
-  const copyFrontendGuide = async () => {
-    await navigator.clipboard.writeText(frontendGuide);
-    setFrontendCopied(true);
-    setTimeout(() => setFrontendCopied(false), 2000);
   };
 
   return (
@@ -918,47 +800,19 @@ function ArticleJsonLd({ article }) {
               </>
             )}
 
-            {step === "frontend" && (
-              <>
-                <div className="rounded-md bg-emerald-50 border border-emerald-200 p-4 mb-4">
-                  <p className="text-sm text-emerald-800">
-                    <strong>🚀 Implementation Guide:</strong> Copy this code to integrate the blog
-                    into your {formData.domain || "website"}. Examples are in Next.js but work with any framework.
-                  </p>
-                </div>
-
-                <div className="flex gap-2 mb-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={copyFrontendGuide}
-                    className="flex items-center gap-2"
-                  >
-                    {frontendCopied ? (
-                      <>
-                        <Check className="h-4 w-4 text-green-600" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4" />
-                        Copy Code
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <div className="relative">
-                  <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-72 overflow-y-auto">
-                    <code>{frontendGuide}</code>
-                  </pre>
-                </div>
-              </>
-            )}
-
             {step === "checkout" && (
               <div className="space-y-6">
-                {checkoutSuccess ? (
+                {hasActiveSubscription ? (
+                  <div className="rounded-md bg-green-50 border border-green-200 p-4">
+                    <div className="flex items-center gap-2 text-green-800">
+                      <Check className="h-5 w-5" />
+                      <strong>You already have an active subscription!</strong>
+                    </div>
+                    <p className="text-sm text-green-700 mt-1">
+                      Your existing subscription covers this website. Click &quot;Next&quot; to continue setup.
+                    </p>
+                  </div>
+                ) : checkoutSuccess ? (
                   <div className="rounded-md bg-green-50 border border-green-200 p-4">
                     <div className="flex items-center gap-2 text-green-800">
                       <Check className="h-5 w-5" />

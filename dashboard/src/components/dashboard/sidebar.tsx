@@ -10,6 +10,7 @@ import {
   BookOpen,
   LogOut,
   ChevronRight,
+  CreditCard,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -29,6 +30,11 @@ const navigation = [
     name: "Generation Logs",
     href: "/dashboard/logs",
     icon: FileText,
+  },
+  {
+    name: "Billing",
+    href: "/dashboard/billing",
+    icon: CreditCard,
   },
   {
     name: "Setup Guide",
