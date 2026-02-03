@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Terminal, Book, Zap, Bot, Code, FileText, Settings } from "lucide-react";
+import { ArrowLeft, Terminal, Book, Zap, Bot, Code, FileText, Settings, Globe } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Documentation | IndexYourNiche",
@@ -79,6 +79,7 @@ export default function DocsPage() {
               <a href="#blog" className="block py-1.5 text-sm text-gray-600 hover:text-emerald-600">iyn blog</a>
 
               <p className="font-semibold text-sm text-gray-900 mb-3 mt-6">Guides</p>
+              <a href="#geo-setup" className="block py-1.5 text-sm text-gray-600 hover:text-emerald-600">GEO Setup (robots.txt)</a>
               <a href="#ai-agents" className="block py-1.5 text-sm text-gray-600 hover:text-emerald-600">AI Agent Integration</a>
               <a href="#config" className="block py-1.5 text-sm text-gray-600 hover:text-emerald-600">Configuration</a>
             </nav>
@@ -283,6 +284,114 @@ Options:
 ├── page.tsx        # Blog listing page
 └── [slug]/
     └── page.tsx    # Individual article with GEO features`}</CodeBlock>
+            </Section>
+
+            <Section id="geo-setup" title="GEO Setup (robots.txt)" icon={Globe}>
+              <p className="text-gray-600 mb-4">
+                <strong>Generative Engine Optimization (GEO)</strong> is about making your content visible in AI-powered search engines
+                like ChatGPT, Perplexity, Claude, and Gemini. A key step is configuring your <code className="bg-gray-100 px-1 rounded">robots.txt</code> to
+                explicitly allow AI crawlers.
+              </p>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                <p className="text-amber-800 text-sm">
+                  <strong>Why this matters:</strong> Many AI companies only index sites that explicitly permit their bots.
+                  Without proper robots.txt configuration, your content may not appear in AI search results.
+                </p>
+              </div>
+
+              <h3 className="text-lg font-semibold mt-6 mb-3">robots.txt Template for GEO</h3>
+              <p className="text-gray-600 mb-4">
+                Add this to your <code className="bg-gray-100 px-1 rounded">public/robots.txt</code> file:
+              </p>
+
+              <CodeBlock title="public/robots.txt">{`# robots.txt - Optimized for SEO & GEO
+# Allow all bots by default
+User-agent: *
+Allow: /
+
+# AI / LLM Crawlers - Explicitly Allowed
+# OpenAI (ChatGPT, GPT)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+# Anthropic (Claude)
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+# Google AI (Gemini/Bard)
+User-agent: Google-Extended
+Allow: /
+
+# Perplexity AI Search
+User-agent: PerplexityBot
+Allow: /
+
+# Common Crawl (used by many AI companies)
+User-agent: CCBot
+Allow: /
+
+# Meta AI
+User-agent: FacebookBot
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+# Amazon (Alexa, AI)
+User-agent: Amazonbot
+Allow: /
+
+# Apple (Siri, Spotlight)
+User-agent: Applebot
+Allow: /
+
+# Cohere AI
+User-agent: cohere-ai
+Allow: /
+
+# You.com AI Search
+User-agent: YouBot
+Allow: /
+
+# Sitemap
+Sitemap: https://yourdomain.com/sitemap.xml`}</CodeBlock>
+
+              <h3 className="text-lg font-semibold mt-6 mb-3">AI Bot Reference</h3>
+              <p className="text-gray-600 mb-4">Here are the main AI crawlers and what they're used for:</p>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-semibold">Bot</th>
+                      <th className="px-4 py-2 text-left font-semibold">Company</th>
+                      <th className="px-4 py-2 text-left font-semibold">Purpose</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    <tr><td className="px-4 py-2 font-mono text-xs">GPTBot</td><td className="px-4 py-2">OpenAI</td><td className="px-4 py-2">Training & ChatGPT</td></tr>
+                    <tr><td className="px-4 py-2 font-mono text-xs">ChatGPT-User</td><td className="px-4 py-2">OpenAI</td><td className="px-4 py-2">ChatGPT browsing</td></tr>
+                    <tr><td className="px-4 py-2 font-mono text-xs">Claude-Web</td><td className="px-4 py-2">Anthropic</td><td className="px-4 py-2">Claude web search</td></tr>
+                    <tr><td className="px-4 py-2 font-mono text-xs">Google-Extended</td><td className="px-4 py-2">Google</td><td className="px-4 py-2">Gemini/Bard AI</td></tr>
+                    <tr><td className="px-4 py-2 font-mono text-xs">PerplexityBot</td><td className="px-4 py-2">Perplexity</td><td className="px-4 py-2">AI search engine</td></tr>
+                    <tr><td className="px-4 py-2 font-mono text-xs">CCBot</td><td className="px-4 py-2">Common Crawl</td><td className="px-4 py-2">Dataset for AI training</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mt-6">
+                <p className="text-emerald-800 text-sm">
+                  <strong>Pro tip:</strong> The setup prompt in your dashboard includes a ready-to-copy robots.txt
+                  template customized with your domain's sitemap URL.
+                </p>
+              </div>
             </Section>
 
             <Section id="ai-agents" title="AI Agent Integration" icon={Bot}>

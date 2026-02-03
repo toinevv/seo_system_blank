@@ -1,11 +1,127 @@
 # IndexYourNiche Robots.txt
+# Optimized for both traditional SEO and Generative Engine Optimization (GEO)
+
+# ===========================================
+# DEFAULT: Allow all bots
+# ===========================================
 User-agent: *
 Allow: /
-
-# Disallow dashboard/admin areas
 Disallow: /dashboard
 Disallow: /api/
 Disallow: /auth/
 
-# Sitemap
+# ===========================================
+# TRADITIONAL SEARCH ENGINES
+# ===========================================
+
+# Google
+User-agent: Googlebot
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Bing
+User-agent: Bingbot
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# ===========================================
+# AI / LLM CRAWLERS - EXPLICITLY ALLOWED
+# We want to appear in AI search results!
+# ===========================================
+
+# OpenAI - GPT training and ChatGPT browsing
+User-agent: GPTBot
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Anthropic - Claude web search
+User-agent: Claude-Web
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Google AI (Gemini/Bard training)
+User-agent: Google-Extended
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Perplexity AI Search
+User-agent: PerplexityBot
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Common Crawl (used by many AI companies)
+User-agent: CCBot
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Meta AI
+User-agent: FacebookBot
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+User-agent: meta-externalagent
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Amazon (Alexa, AI training)
+User-agent: Amazonbot
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Apple (Siri, Spotlight)
+User-agent: Applebot
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Cohere AI
+User-agent: cohere-ai
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# You.com AI Search
+User-agent: YouBot
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# ===========================================
+# SITEMAP
+# ===========================================
 Sitemap: https://indexyourniche.com/sitemap.xml

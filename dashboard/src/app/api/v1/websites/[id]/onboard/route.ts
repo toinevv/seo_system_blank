@@ -185,7 +185,32 @@ export async function GET(
 
     // STATE: SCANNING - Check if scan is complete
     if (currentStatus === "scanning") {
-      const hasScanData = !!seoConfig.niche_description || !!seoConfig.main_keywords;
+      // Check seo_config for preview scan data
+      let hasScanData = !!seoConfig.niche_description || !!seoConfig.main_keywords;
+      let scanContext = seoConfig;
+
+      // Also check website_scans table (where full /scan saves data)
+      if (!hasScanData) {
+        const { data: scanData } = await supabase
+          .from("website_scans")
+          .select("niche_description, main_keywords, content_themes")
+          .eq("website_id", id)
+          .eq("scan_status", "completed")
+          .order("last_scanned_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (scanData?.niche_description || scanData?.main_keywords?.length) {
+          hasScanData = true;
+          // Copy scan data to seo_config for topic discovery
+          scanContext = {
+            ...seoConfig,
+            niche_description: scanData.niche_description,
+            main_keywords: scanData.main_keywords,
+            content_themes: scanData.content_themes,
+          };
+        }
+      }
 
       if (hasScanData) {
         // Scan complete! Move to discovering phase
@@ -193,7 +218,7 @@ export async function GET(
           .from("websites")
           .update({
             seo_config: {
-              ...seoConfig,
+              ...scanContext,
               onboarding_status: "discovering",
             },
           })
@@ -201,7 +226,7 @@ export async function GET(
 
         // Trigger topic discovery (50 topics in batches)
         if (workerUrl) {
-          triggerTopicDiscovery(id, website.domain, website.language, seoConfig, workerUrl, supabase);
+          triggerTopicDiscovery(id, website.domain, website.language, scanContext, workerUrl, supabase);
         }
 
         return apiSuccess<OnboardingState>({
