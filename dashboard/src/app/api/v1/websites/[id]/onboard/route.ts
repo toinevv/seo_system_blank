@@ -415,6 +415,8 @@ async function triggerTopicDiscovery(
   workerUrl: string,
   supabase: ReturnType<typeof createAdminClient>
 ) {
+  console.log(`[triggerTopicDiscovery] Starting for website ${websiteId} (${domain})`);
+
   // Mark discovery as started
   await supabase
     .from("websites")
@@ -429,48 +431,45 @@ async function triggerTopicDiscovery(
   // Discover topics in batches (fire and forget - will be picked up by polling)
   const batchSize = 10;
   const batches = 5; // 5 batches * 10 = 50 topics
+  let totalTopicsDiscovered = 0;
 
   for (let i = 0; i < batches; i++) {
     try {
-      const response = await fetch(`${workerUrl}/discover-topics`, {
+      // IMPORTANT: Worker reads from query params, not POST body!
+      const discoverUrl = `${workerUrl}/discover-topics?website_id=${websiteId}&count=${batchSize}`;
+      console.log(`[triggerTopicDiscovery] Batch ${i + 1}/${batches}: ${discoverUrl}`);
+
+      const response = await fetch(discoverUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          website_id: websiteId,
-          domain,
-          language,
-          scan_context: seoConfig,
-          count: batchSize,
-        }),
       });
 
       if (response.ok) {
         const result = await response.json();
+        console.log(`[triggerTopicDiscovery] Batch ${i + 1} response:`, {
+          success: result.success,
+          topicsCount: result.topics_discovered || result.topics?.length || 0,
+        });
 
-        // Insert discovered topics directly
-        if (result.success && result.topics?.length > 0) {
-          const topicsToInsert = result.topics.map((t: {
-            title: string;
-            keywords?: string[];
-            category?: string;
-            priority?: number
-          }) => ({
-            website_id: websiteId,
-            title: t.title,
-            keywords: t.keywords || [],
-            category: t.category || "general",
-            priority: t.priority || 5,
-            source: "ai_suggested",
-          }));
+        // Worker saves topics directly to DB, but also returns count
+        // No need to insert here - worker handles it
+        totalTopicsDiscovered += result.topics_discovered || 0;
 
-          await supabase.from("topics").insert(topicsToInsert);
+        // If we have enough topics, stop early
+        if (totalTopicsDiscovered >= 10) {
+          console.log(`[triggerTopicDiscovery] Got ${totalTopicsDiscovered} topics, stopping early`);
+          break;
         }
+      } else {
+        const errorText = await response.text();
+        console.error(`[triggerTopicDiscovery] Batch ${i + 1} HTTP error:`, response.status, errorText);
       }
     } catch (err) {
-      console.error(`Topic discovery batch ${i + 1} failed:`, err);
+      console.error(`[triggerTopicDiscovery] Batch ${i + 1} failed:`, err);
     }
 
     // Small delay between batches to avoid rate limiting
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
+
+  console.log(`[triggerTopicDiscovery] Completed for ${domain}, total topics: ${totalTopicsDiscovered}`);
 }
