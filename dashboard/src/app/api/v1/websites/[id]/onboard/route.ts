@@ -220,13 +220,26 @@ export async function GET(
             seo_config: {
               ...scanContext,
               onboarding_status: "discovering",
+              discovery_started_at: new Date().toISOString(),
             },
           })
           .eq("id", id);
 
-        // Trigger topic discovery (50 topics in batches)
+        // Trigger first batch of topic discovery synchronously (serverless requires await)
         if (workerUrl) {
-          triggerTopicDiscovery(id, website.domain, website.language, scanContext, workerUrl, supabase);
+          try {
+            const discoverUrl = `${workerUrl}/discover-topics?website_id=${id}&count=10`;
+            console.log(`[onboard] Triggering initial topic discovery: ${discoverUrl}`);
+            const response = await fetch(discoverUrl, { method: "POST" });
+            if (response.ok) {
+              const result = await response.json();
+              console.log(`[onboard] Initial topic discovery result:`, result);
+            } else {
+              console.error(`[onboard] Topic discovery HTTP error:`, response.status);
+            }
+          } catch (err) {
+            console.error(`[onboard] Topic discovery failed:`, err);
+          }
         }
 
         return apiSuccess<OnboardingState>({
@@ -252,8 +265,22 @@ export async function GET(
         .select("*", { count: "exact", head: true })
         .eq("website_id", id);
 
-      const targetTopics = 50;
       const hasEnoughTopics = (topicsCount || 0) >= 10; // Consider done if at least 10
+
+      // If not enough topics yet, trigger another batch (each poll makes progress)
+      if (!hasEnoughTopics && workerUrl) {
+        try {
+          const discoverUrl = `${workerUrl}/discover-topics?website_id=${id}&count=10`;
+          console.log(`[onboard] Discovering more topics (current: ${topicsCount}): ${discoverUrl}`);
+          const response = await fetch(discoverUrl, { method: "POST" });
+          if (response.ok) {
+            const result = await response.json();
+            console.log(`[onboard] Additional topic discovery result:`, result);
+          }
+        } catch (err) {
+          console.error(`[onboard] Additional topic discovery failed:`, err);
+        }
+      }
 
       if (hasEnoughTopics) {
         // Topics ready! Move to generating phase
@@ -263,15 +290,25 @@ export async function GET(
             seo_config: {
               ...seoConfig,
               onboarding_status: "generating",
+              generating_started_at: new Date().toISOString(),
             },
           })
           .eq("id", id);
 
-        // Trigger first article generation
+        // Trigger first article generation synchronously (serverless requires await)
         if (workerUrl) {
-          fetch(`${workerUrl}/generate?website_id=${id}`, {
-            method: "POST",
-          }).catch(err => console.error("Onboard generate trigger error:", err));
+          try {
+            console.log(`[onboard] Triggering article generation for ${id}`);
+            const response = await fetch(`${workerUrl}/generate?website_id=${id}`, { method: "POST" });
+            if (response.ok) {
+              const result = await response.json();
+              console.log(`[onboard] Generation triggered:`, result);
+            } else {
+              console.error(`[onboard] Generation HTTP error:`, response.status);
+            }
+          } catch (err) {
+            console.error(`[onboard] Generation trigger failed:`, err);
+          }
         }
 
         return apiSuccess<OnboardingState>({
@@ -296,15 +333,23 @@ export async function GET(
             seo_config: {
               ...seoConfig,
               onboarding_status: "generating",
+              generating_started_at: new Date().toISOString(),
             },
           })
           .eq("id", id);
 
-        // Trigger first article generation
+        // Trigger first article generation synchronously
         if (workerUrl) {
-          fetch(`${workerUrl}/generate?website_id=${id}`, {
-            method: "POST",
-          }).catch(err => console.error("Onboard generate trigger error:", err));
+          try {
+            console.log(`[onboard] Triggering generation (discovery timeout) for ${id}`);
+            const response = await fetch(`${workerUrl}/generate?website_id=${id}`, { method: "POST" });
+            if (response.ok) {
+              const result = await response.json();
+              console.log(`[onboard] Generation triggered:`, result);
+            }
+          } catch (err) {
+            console.error(`[onboard] Generation trigger failed:`, err);
+          }
         }
 
         return apiSuccess<OnboardingState>({
@@ -403,73 +448,3 @@ export async function GET(
   }
 }
 
-/**
- * Trigger topic discovery in batches to get ~50 topics
- * Runs asynchronously - doesn't block the response
- */
-async function triggerTopicDiscovery(
-  websiteId: string,
-  domain: string,
-  language: string,
-  seoConfig: Record<string, unknown>,
-  workerUrl: string,
-  supabase: ReturnType<typeof createAdminClient>
-) {
-  console.log(`[triggerTopicDiscovery] Starting for website ${websiteId} (${domain})`);
-
-  // Mark discovery as started
-  await supabase
-    .from("websites")
-    .update({
-      seo_config: {
-        ...seoConfig,
-        discovery_started_at: new Date().toISOString(),
-      },
-    })
-    .eq("id", websiteId);
-
-  // Discover topics in batches (fire and forget - will be picked up by polling)
-  const batchSize = 10;
-  const batches = 5; // 5 batches * 10 = 50 topics
-  let totalTopicsDiscovered = 0;
-
-  for (let i = 0; i < batches; i++) {
-    try {
-      // IMPORTANT: Worker reads from query params, not POST body!
-      const discoverUrl = `${workerUrl}/discover-topics?website_id=${websiteId}&count=${batchSize}`;
-      console.log(`[triggerTopicDiscovery] Batch ${i + 1}/${batches}: ${discoverUrl}`);
-
-      const response = await fetch(discoverUrl, {
-        method: "POST",
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log(`[triggerTopicDiscovery] Batch ${i + 1} response:`, {
-          success: result.success,
-          topicsCount: result.topics_discovered || result.topics?.length || 0,
-        });
-
-        // Worker saves topics directly to DB, but also returns count
-        // No need to insert here - worker handles it
-        totalTopicsDiscovered += result.topics_discovered || 0;
-
-        // If we have enough topics, stop early
-        if (totalTopicsDiscovered >= 10) {
-          console.log(`[triggerTopicDiscovery] Got ${totalTopicsDiscovered} topics, stopping early`);
-          break;
-        }
-      } else {
-        const errorText = await response.text();
-        console.error(`[triggerTopicDiscovery] Batch ${i + 1} HTTP error:`, response.status, errorText);
-      }
-    } catch (err) {
-      console.error(`[triggerTopicDiscovery] Batch ${i + 1} failed:`, err);
-    }
-
-    // Small delay between batches to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-
-  console.log(`[triggerTopicDiscovery] Completed for ${domain}, total topics: ${totalTopicsDiscovered}`);
-}
