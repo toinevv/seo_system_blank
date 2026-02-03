@@ -108,6 +108,7 @@ export default function NewWebsitePage() {
     niche_description?: string;
     content_themes?: string[];
     main_keywords?: string[];
+    homepage_title?: string;
   } | null>(null);
 
   // Plan selection state (user can choose plan during checkout step)
@@ -421,12 +422,19 @@ export default function NewWebsitePage() {
     }
   };
 
-  const steps: { key: Step; title: string; description: string }[] = [
-    { key: "basic", title: "Basic Info", description: "Website name and settings" },
-    { key: "database", title: "Database Setup", description: "Connect your database" },
-    { key: "review", title: "Review", description: "See what we found" },
-    { key: "checkout", title: "Subscribe", description: "Activate your subscription" },
-  ];
+  // Dynamic steps - hide checkout for users with active subscription
+  const steps: { key: Step; title: string; description: string }[] = hasActiveSubscription
+    ? [
+        { key: "basic", title: "Basic Info", description: "Website name and settings" },
+        { key: "database", title: "Database Setup", description: "Connect your database" },
+        { key: "review", title: "Review & Create", description: "Review and create website" },
+      ]
+    : [
+        { key: "basic", title: "Basic Info", description: "Website name and settings" },
+        { key: "database", title: "Database Setup", description: "Connect your database" },
+        { key: "review", title: "Review", description: "See what we found" },
+        { key: "checkout", title: "Subscribe", description: "Activate your subscription" },
+      ];
 
   const currentStepIndex = steps.findIndex((s) => s.key === step);
   const canProceed = () => {
@@ -1348,8 +1356,25 @@ GRANT ALL ON public.blog_articles TO service_role;`;
             </Button>
           )}
 
-          {/* Checkout is the final step - Create Website button is in the checkout card */}
-          {step !== "checkout" && (
+          {/* Final step handling: checkout for non-subscribers, review for subscribers */}
+          {step === "review" && hasActiveSubscription ? (
+            <Button
+              onClick={handleSubmit}
+              disabled={loading || !canProceed()}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Create Website
+                </>
+              )}
+            </Button>
+          ) : step !== "checkout" ? (
             <Button
               onClick={() => handleNextStep(steps[currentStepIndex + 1].key)}
               disabled={!canProceed()}
@@ -1357,7 +1382,7 @@ GRANT ALL ON public.blog_articles TO service_role;`;
               {step === "review" ? "Continue to Payment" : "Next"}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
-          )}
+          ) : null}
         </div>
       </div>
 
