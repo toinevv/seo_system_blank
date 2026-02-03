@@ -51,6 +51,9 @@ export interface Website {
   min_hours_between_posts: number;
   max_hours_between_posts: number;
   last_posting_hour: number | null;
+  // API rotation settings
+  api_rotation_mode: ApiRotationMode;
+  last_api_used: "openai" | "claude" | null;
   created_at: string;
   updated_at: string;
 }
@@ -71,6 +74,9 @@ export type VoiceStyleType = "professional" | "conversational" | "expert" | "fri
 
 // Time variation modes
 export type TimeVariationMode = "fixed" | "window" | "random";
+
+// API rotation modes
+export type ApiRotationMode = "rotate" | "openai_only" | "anthropic_only";
 
 // Human elements for anti-AI detection
 export interface HumanElements {

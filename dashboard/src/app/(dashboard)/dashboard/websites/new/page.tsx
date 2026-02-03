@@ -37,7 +37,7 @@ const extractSupabaseProjectId = (url: string): string | null => {
   return match ? match[1] : null;
 };
 
-type Step = "basic" | "checkout" | "database" | "review";
+type Step = "basic" | "database" | "review" | "checkout";
 
 const PLAN_DETAILS: Record<string, { name: string; price: number; geoPrice: number; articles: number }> = {
   starter: { name: "Starter", price: 30, geoPrice: 35, articles: 3 },
@@ -50,14 +50,14 @@ export default function NewWebsitePage() {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  // Get plan info from URL params (passed from signup)
-  const planKey = searchParams.get("plan") || "starter";
+  // Get plan info from URL params (passed from signup) - default to Pro as featured plan
+  const planKey = searchParams.get("plan") || "pro";
   // Default GEO to true (only false if explicitly set to "false")
   const withGeo = searchParams.get("geo") !== "false";
   const checkoutSuccess = searchParams.get("checkout") === "success";
 
-  // Start at database step if coming back from successful payment (checkout is now step 2)
-  const [step, setStep] = useState<Step>(checkoutSuccess ? "database" : "basic");
+  // Start at checkout step if coming back from successful payment (shows success + Create button)
+  const [step, setStep] = useState<Step>(checkoutSuccess ? "checkout" : "basic");
   const [loading, setLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -246,13 +246,13 @@ export default function NewWebsitePage() {
 
   // Handle step navigation with preview scan trigger
   const handleNextStep = (nextStep: Step) => {
-    // When moving from basic to checkout, trigger preview scan
-    if (step === "basic" && nextStep === "checkout" && formData.domain) {
+    // When moving from basic to database, trigger preview scan
+    if (step === "basic" && nextStep === "database" && formData.domain) {
       triggerPreviewScan(formData.domain);
     }
-    // Skip checkout step if user already has active subscription
+    // Skip checkout step if user already has active subscription (go straight to creating website)
     if (nextStep === "checkout" && hasActiveSubscription) {
-      setStep("database");
+      handleSubmit();
       return;
     }
     setStep(nextStep);
@@ -339,9 +339,9 @@ export default function NewWebsitePage() {
 
   const steps: { key: Step; title: string; description: string }[] = [
     { key: "basic", title: "Basic Info", description: "Website name and settings" },
-    { key: "checkout", title: "Subscribe", description: "Activate your subscription" },
     { key: "database", title: "Database Setup", description: "Connect your database" },
-    { key: "review", title: "Review", description: "Confirm and create" },
+    { key: "review", title: "Review", description: "See what we found" },
+    { key: "checkout", title: "Subscribe", description: "Activate your subscription" },
   ];
 
   const currentStepIndex = steps.findIndex((s) => s.key === step);
@@ -349,19 +349,21 @@ export default function NewWebsitePage() {
     switch (step) {
       case "basic":
         return formData.name && formData.domain && formData.product_id;
-      case "checkout":
-        return checkoutSuccess || skippedPayment || hasActiveSubscription;
       case "database":
         return formData.target_supabase_url && formData.target_supabase_service_key;
+      case "review":
+        return true; // Always allow proceeding to checkout
+      case "checkout":
+        return checkoutSuccess || skippedPayment || hasActiveSubscription;
       default:
         return true;
     }
   };
 
-  // Handle skip payment (continue without subscription)
+  // Handle skip payment (create website without subscription)
   const handleSkipPayment = () => {
     setSkippedPayment(true);
-    handleNextStep("review");
+    handleSubmit(); // Create website directly
   };
 
   // Handle Stripe checkout
@@ -806,11 +808,24 @@ GRANT ALL ON public.blog_articles TO service_role;`;
                   <div className="rounded-md bg-green-50 border border-green-200 p-4">
                     <div className="flex items-center gap-2 text-green-800">
                       <Check className="h-5 w-5" />
-                      <strong>You already have an active subscription!</strong>
+                      <strong>You already have an active subscription</strong>
                     </div>
                     <p className="text-sm text-green-700 mt-1">
-                      Your existing subscription covers this website. Click &quot;Next&quot; to continue setup.
+                      Your existing subscription covers this website.
                     </p>
+                    <Button onClick={handleSubmit} disabled={loading} className="mt-3" size="lg">
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          Create Website
+                        </>
+                      )}
+                    </Button>
                   </div>
                 ) : checkoutSuccess ? (
                   <div className="rounded-md bg-green-50 border border-green-200 p-4">
@@ -819,137 +834,101 @@ GRANT ALL ON public.blog_articles TO service_role;`;
                       <strong>Payment successful!</strong>
                     </div>
                     <p className="text-sm text-green-700 mt-1">
-                      Your subscription is now active. Click &quot;Next&quot; to finish creating your website.
+                      Your {PLAN_DETAILS[selectedPlan]?.name} subscription is now active.
                     </p>
+                    <Button onClick={handleSubmit} disabled={loading} className="mt-3" size="lg">
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          Create Website
+                        </>
+                      )}
+                    </Button>
                   </div>
                 ) : (
                   <>
-                    {/* Website Scan Preview - Show what we discovered */}
-                    {previewScanStatus === "scanning" && (
-                      <div className="rounded-md bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-5">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-blue-900">Analyzing Your Website</h3>
-                            <p className="text-sm text-blue-700">Discovering topics and keywords for {formData.domain}...</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {previewScanStatus === "done" && previewScanData && (
-                      <div className="rounded-md bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-5">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                            <Sparkles className="h-5 w-5 text-emerald-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-emerald-900">We Found Great Content Opportunities!</h3>
-                            <p className="text-sm text-emerald-700">Here&apos;s what we discovered on {formData.domain}</p>
-                          </div>
-                        </div>
-
-                        {previewScanData.niche_description && (
-                          <div className="mb-4">
-                            <p className="text-sm font-medium text-gray-700 mb-1">Your Niche</p>
-                            <p className="text-sm text-gray-600 bg-white/60 rounded-md p-2">
-                              {previewScanData.niche_description}
-                            </p>
-                          </div>
-                        )}
-
-                        {previewScanData.content_themes && previewScanData.content_themes.length > 0 && (
-                          <div className="mb-4">
-                            <p className="text-sm font-medium text-gray-700 mb-2">Content Themes We&apos;ll Write About</p>
-                            <div className="flex flex-wrap gap-2">
-                              {previewScanData.content_themes.slice(0, 5).map((theme, i) => (
-                                <span
-                                  key={i}
-                                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800"
-                                >
-                                  {theme}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {previewScanData.main_keywords && previewScanData.main_keywords.length > 0 && (
-                          <div>
-                            <p className="text-sm font-medium text-gray-700 mb-2">Target Keywords</p>
-                            <div className="flex flex-wrap gap-2">
-                              {previewScanData.main_keywords.slice(0, 8).map((keyword, i) => (
-                                <span
-                                  key={i}
-                                  className="inline-flex items-center px-2 py-1 rounded text-xs bg-white/80 text-gray-700 border border-gray-200"
-                                >
-                                  {keyword}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {previewScanStatus === "error" && (
-                      <div className="rounded-md bg-amber-50 border border-amber-200 p-4">
-                        <p className="text-sm text-amber-800">
-                          <strong>Note:</strong> We couldn&apos;t fully analyze {formData.domain} yet.
-                          Don&apos;t worry - we&apos;ll do a complete scan after setup to find the best topics for your content.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Featured Business Plan */}
+                    {/* Pro Plan - Featured */}
                     <div
-                      onClick={() => setSelectedPlan("business")}
+                      onClick={() => setSelectedPlan("pro")}
                       className={`relative rounded-xl border-2 p-6 cursor-pointer transition-all ${
-                        selectedPlan === "business"
-                          ? "border-primary bg-gradient-to-r from-primary/10 via-primary/5 to-purple-500/10 shadow-lg ring-2 ring-primary/20"
-                          : "border-primary/50 bg-gradient-to-r from-primary/5 to-purple-500/5 hover:border-primary hover:shadow-md"
+                        selectedPlan === "pro"
+                          ? "border-primary bg-primary/5 shadow-lg ring-2 ring-primary/20"
+                          : "border-primary/50 hover:border-primary hover:shadow-md"
                       }`}
                     >
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-primary to-purple-600 text-primary-foreground text-sm font-semibold rounded-full shadow-md">
-                        ⭐ Best Value
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-primary text-primary-foreground text-sm font-semibold rounded-full shadow-md">
+                        Best Value
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
-                            selectedPlan === "business" ? "border-primary" : "border-muted-foreground"
+                            selectedPlan === "pro" ? "border-primary" : "border-muted-foreground"
                           }`}>
-                            {selectedPlan === "business" && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
+                            {selectedPlan === "pro" && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
                           </div>
                           <div>
-                            <h4 className="text-xl font-bold">Business</h4>
-                            <p className="text-sm text-muted-foreground">For serious growth</p>
+                            <h4 className="text-xl font-bold">Pro</h4>
+                            <p className="text-sm text-muted-foreground">Most popular choice</p>
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="flex items-baseline gap-1">
-                            <span className="text-3xl font-bold">€{enableGeo ? PLAN_DETAILS.business.geoPrice : PLAN_DETAILS.business.price}</span>
+                            <span className="text-3xl font-bold">€{enableGeo ? PLAN_DETAILS.pro.geoPrice : PLAN_DETAILS.pro.price}</span>
                             <span className="text-muted-foreground">/mo</span>
                           </div>
-                          <p className="text-sm text-primary font-medium">{PLAN_DETAILS.business.articles} articles/month</p>
+                          <p className="text-sm text-primary font-medium">{PLAN_DETAILS.pro.articles} articles/month</p>
                         </div>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
                         <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
-                          <Check className="h-3 w-3 mr-1" /> 10 websites
+                          <Check className="h-3 w-3 mr-1" /> 3 websites
                         </span>
                         <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
-                          <Check className="h-3 w-3 mr-1" /> Priority support
+                          <Check className="h-3 w-3 mr-1" /> Email support
                         </span>
                         <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
-                          <Check className="h-3 w-3 mr-1" /> Best €/article
+                          <Check className="h-3 w-3 mr-1" /> Great €/article ratio
                         </span>
                       </div>
                     </div>
 
-                    {/* Starter and Pro Plans Side by Side */}
+                    {/* Business and Starter Side by Side */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Business Plan */}
+                      <div
+                        onClick={() => setSelectedPlan("business")}
+                        className={`relative rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                          selectedPlan === "business"
+                            ? "border-primary bg-primary/5 shadow-md"
+                            : "border-muted hover:border-primary/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                            selectedPlan === "business" ? "border-primary" : "border-muted-foreground"
+                          }`}>
+                            {selectedPlan === "business" && <div className="h-2 w-2 rounded-full bg-primary" />}
+                          </div>
+                          <div>
+                            <h4 className="font-semibold">Business</h4>
+                            <p className="text-xs text-muted-foreground">Ranks fastest</p>
+                          </div>
+                        </div>
+                        <div className="flex items-baseline gap-1 mb-2">
+                          <span className="text-2xl font-bold">€{enableGeo ? PLAN_DETAILS.business.geoPrice : PLAN_DETAILS.business.price}</span>
+                          <span className="text-sm text-muted-foreground">/mo</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {PLAN_DETAILS.business.articles} articles/month
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">10 websites • Priority support</p>
+                      </div>
+
                       {/* Starter Plan */}
                       <div
                         onClick={() => setSelectedPlan("starter")}
@@ -967,69 +946,41 @@ GRANT ALL ON public.blog_articles TO service_role;`;
                           </div>
                           <h4 className="font-semibold">Starter</h4>
                         </div>
-                        <div className="flex items-baseline gap-1 mb-3">
+                        <div className="flex items-baseline gap-1 mb-2">
                           <span className="text-2xl font-bold">€{enableGeo ? PLAN_DETAILS.starter.geoPrice : PLAN_DETAILS.starter.price}</span>
                           <span className="text-sm text-muted-foreground">/mo</span>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {PLAN_DETAILS.starter.articles} articles/month • 1 website
+                          {PLAN_DETAILS.starter.articles} articles/month
                         </p>
-                      </div>
-
-                      {/* Pro Plan */}
-                      <div
-                        onClick={() => setSelectedPlan("pro")}
-                        className={`relative rounded-lg border-2 p-4 cursor-pointer transition-all ${
-                          selectedPlan === "pro"
-                            ? "border-primary bg-primary/5 shadow-md"
-                            : "border-muted hover:border-primary/50"
-                        }`}
-                      >
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-muted text-muted-foreground text-xs font-medium rounded-full">
-                          Popular
-                        </div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
-                            selectedPlan === "pro" ? "border-primary" : "border-muted-foreground"
-                          }`}>
-                            {selectedPlan === "pro" && <div className="h-2 w-2 rounded-full bg-primary" />}
-                          </div>
-                          <h4 className="font-semibold">Pro</h4>
-                        </div>
-                        <div className="flex items-baseline gap-1 mb-3">
-                          <span className="text-2xl font-bold">€{enableGeo ? PLAN_DETAILS.pro.geoPrice : PLAN_DETAILS.pro.price}</span>
-                          <span className="text-sm text-muted-foreground">/mo</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {PLAN_DETAILS.pro.articles} articles/month • 3 websites
-                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">1 website</p>
                       </div>
                     </div>
 
-                    {/* GEO Optimization Toggle */}
+                    {/* GEO Optimization Toggle - Subtle */}
                     <div
                       onClick={() => setEnableGeo(!enableGeo)}
-                      className={`flex items-center justify-between rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                      className={`flex items-center justify-between rounded-lg border p-3 cursor-pointer transition-all ${
                         enableGeo
-                          ? "border-primary bg-gradient-to-r from-primary/10 to-purple-500/10"
-                          : "border-muted hover:border-primary/50"
+                          ? "border-primary/50 bg-primary/5"
+                          : "border-muted hover:border-muted-foreground"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <Sparkles className={`h-5 w-5 ${enableGeo ? "text-primary" : "text-muted-foreground"}`} />
+                      <div className="flex items-center gap-2">
+                        <Sparkles className={`h-4 w-4 ${enableGeo ? "text-primary" : "text-muted-foreground"}`} />
                         <div>
-                          <p className="font-medium">Add GEO Optimization</p>
-                          <p className="text-sm text-muted-foreground">
-                            Optimize for AI search (ChatGPT, Perplexity, Claude)
+                          <p className="text-sm font-medium">GEO Optimization</p>
+                          <p className="text-xs text-muted-foreground">
+                            Optimize for AI search engines
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-primary">
+                        <span className="text-xs text-muted-foreground">
                           +€{(PLAN_DETAILS[selectedPlan]?.geoPrice || 0) - (PLAN_DETAILS[selectedPlan]?.price || 0)}/mo
                         </span>
-                        <div className={`h-6 w-11 rounded-full transition-colors ${enableGeo ? "bg-primary" : "bg-muted"}`}>
-                          <div className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform mt-0.5 ${enableGeo ? "translate-x-5 ml-0.5" : "translate-x-0.5"}`} />
+                        <div className={`h-5 w-9 rounded-full transition-colors ${enableGeo ? "bg-primary" : "bg-muted"}`}>
+                          <div className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform mt-0.5 ${enableGeo ? "translate-x-4 ml-0.5" : "translate-x-0.5"}`} />
                         </div>
                       </div>
                     </div>
@@ -1046,7 +997,6 @@ GRANT ALL ON public.blog_articles TO service_role;`;
                         </div>
                       </div>
 
-                      {/* Checkout Error Display */}
                       {error && (
                         <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive mb-4">
                           {error}
@@ -1077,15 +1027,16 @@ GRANT ALL ON public.blog_articles TO service_role;`;
                     </div>
 
                     {/* Skip Payment Option */}
-                    <div className="text-center pt-2">
+                    <div className="text-center">
                       <button
                         onClick={handleSkipPayment}
+                        disabled={loading}
                         className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
                       >
-                        Continue without subscribing →
+                        {loading ? "Creating..." : "Continue without subscribing"}
                       </button>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Your website will be created but content generation won&apos;t start
+                        Website created but content generation won&apos;t start
                       </p>
                     </div>
                   </>
@@ -1094,59 +1045,118 @@ GRANT ALL ON public.blog_articles TO service_role;`;
             )}
 
             {step === "review" && (
-              <div className="space-y-4">
-                {checkoutSuccess && (
-                  <div className="rounded-md bg-green-50 border border-green-200 p-3 mb-4">
-                    <p className="text-sm text-green-800 flex items-center gap-2">
-                      <Check className="h-4 w-4" />
-                      Subscription active - {PLAN_DETAILS[selectedPlan]?.name} plan
-                      {enableGeo && " + GEO"}
+              <div className="space-y-6">
+                {/* Scan Results - Show value before payment */}
+                {previewScanStatus === "scanning" && (
+                  <div className="rounded-md bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-blue-900">Analyzing Your Website</h3>
+                        <p className="text-sm text-blue-700">Discovering topics and keywords for {formData.domain}...</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {previewScanStatus === "done" && previewScanData && (
+                  <div className="rounded-md bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                        <Sparkles className="h-5 w-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-emerald-900">We Found Great Content Opportunities</h3>
+                        <p className="text-sm text-emerald-700">Here&apos;s what we discovered on {formData.domain}</p>
+                      </div>
+                    </div>
+
+                    {previewScanData.niche_description && (
+                      <div className="mb-4">
+                        <p className="text-sm font-medium text-gray-700 mb-1">Your Niche</p>
+                        <p className="text-sm text-gray-600 bg-white/60 rounded-md p-2">
+                          {previewScanData.niche_description}
+                        </p>
+                      </div>
+                    )}
+
+                    {previewScanData.content_themes && previewScanData.content_themes.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Content Themes We&apos;ll Write About</p>
+                        <div className="flex flex-wrap gap-2">
+                          {previewScanData.content_themes.slice(0, 5).map((theme, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800"
+                            >
+                              {theme}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {previewScanData.main_keywords && previewScanData.main_keywords.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">Target Keywords</p>
+                        <div className="flex flex-wrap gap-2">
+                          {previewScanData.main_keywords.slice(0, 8).map((keyword, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center px-2 py-1 rounded text-xs bg-white/80 text-gray-700 border border-gray-200"
+                            >
+                              {keyword}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {previewScanStatus === "error" && (
+                  <div className="rounded-md bg-amber-50 border border-amber-200 p-4">
+                    <p className="text-sm text-amber-800">
+                      We couldn&apos;t fully analyze {formData.domain} yet.
+                      Don&apos;t worry - we&apos;ll do a complete scan after setup to find the best topics for your content.
                     </p>
                   </div>
                 )}
-                {skippedPayment && (
-                  <div className="rounded-md bg-amber-50 border border-amber-200 p-3 mb-4">
-                    <p className="text-sm text-amber-800 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      No subscription - Content generation won&apos;t start automatically
+
+                {previewScanStatus === "idle" && (
+                  <div className="rounded-md bg-muted p-4">
+                    <p className="text-sm text-muted-foreground">
+                      Once you proceed, we&apos;ll analyze your website and discover content opportunities tailored to your niche.
                     </p>
-                    <button
-                      onClick={() => setStep("checkout")}
-                      className="text-sm text-amber-900 font-medium underline mt-1"
-                    >
-                      Go back to subscribe →
-                    </button>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Website Name</p>
-                    <p className="font-medium">{formData.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Domain</p>
-                    <p className="font-medium">{formData.domain}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Product ID</p>
-                    <p className="font-medium">{formData.product_id}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Language</p>
-                    <p className="font-medium">
-                      {LANGUAGES.find((l) => l.value === formData.language)?.label || formData.language}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Posting Frequency</p>
-                    <p className="font-medium">Every {formData.days_between_posts} days</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Target Database</p>
-                    <p className="font-medium">{formData.target_supabase_url ? "✓ Configured" : "Not set"}</p>
+
+                {/* Settings Summary */}
+                <div className="border-t pt-4">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-3">Your Settings</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Website</p>
+                      <p className="font-medium">{formData.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Domain</p>
+                      <p className="font-medium">{formData.domain}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Language</p>
+                      <p className="font-medium">
+                        {LANGUAGES.find((l) => l.value === formData.language)?.label || formData.language}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Posting</p>
+                      <p className="font-medium">Every {formData.days_between_posts} days</p>
+                    </div>
                   </div>
                 </div>
-
               </div>
             )}
           </CardContent>
@@ -1171,26 +1181,13 @@ GRANT ALL ON public.blog_articles TO service_role;`;
             </Button>
           )}
 
-          {step === "review" ? (
-            <Button onClick={handleSubmit} disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Create Website
-                </>
-              )}
-            </Button>
-          ) : (
+          {/* Checkout is the final step - Create Website button is in the checkout card */}
+          {step !== "checkout" && (
             <Button
               onClick={() => handleNextStep(steps[currentStepIndex + 1].key)}
               disabled={!canProceed()}
             >
-              Next
+              {step === "review" ? "Continue to Payment" : "Next"}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           )}

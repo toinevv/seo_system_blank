@@ -84,6 +84,18 @@ ADD COLUMN IF NOT EXISTS last_posting_hour INTEGER;
 
 COMMENT ON COLUMN public.websites.last_posting_hour IS 'Hour of last post (to vary subsequent posting times)';
 
+-- API Rotation Settings
+ALTER TABLE public.websites
+ADD COLUMN IF NOT EXISTS api_rotation_mode TEXT DEFAULT 'rotate'
+    CHECK (api_rotation_mode IN ('rotate', 'openai_only', 'anthropic_only'));
+
+COMMENT ON COLUMN public.websites.api_rotation_mode IS 'API provider selection: rotate between both, or prefer one';
+
+ALTER TABLE public.websites
+ADD COLUMN IF NOT EXISTS last_api_used TEXT;
+
+COMMENT ON COLUMN public.websites.last_api_used IS 'Last API provider used (openai or claude) for rotation';
+
 -- =============================================
 -- TOPICS TABLE ADDITIONS
 -- =============================================

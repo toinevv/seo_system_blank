@@ -181,6 +181,46 @@ HUMAN_ELEMENTS = {
     "transition_variety": True
 }
 
+# Search intent types for topic classification (GEO optimization)
+SEARCH_INTENTS = {
+    "informational": {
+        "description": "Educational content - how-to guides, explanations, tutorials",
+        "signals": ["how to", "what is", "guide", "tutorial", "learn", "understand"],
+        "geo_priority": "high"  # AI search engines love informational content
+    },
+    "commercial": {
+        "description": "Comparison and evaluation - reviews, best-of lists, comparisons",
+        "signals": ["best", "top", "vs", "compare", "review", "alternative"],
+        "geo_priority": "high"
+    },
+    "transactional": {
+        "description": "Action-oriented - tools, templates, resources, downloads",
+        "signals": ["buy", "download", "template", "tool", "free", "get"],
+        "geo_priority": "medium"
+    },
+    "navigational": {
+        "description": "Brand/product specific - specific features, documentation",
+        "signals": ["login", "pricing", "features", "docs", "support"],
+        "geo_priority": "low"
+    }
+}
+
+# Seasonal content calendar for trending topics
+SEASONAL_THEMES = {
+    1: ["new year resolutions", "planning", "goals", "fresh start", "winter"],
+    2: ["valentine", "love", "relationships", "winter activities"],
+    3: ["spring", "renewal", "spring cleaning", "preparation"],
+    4: ["spring cleaning", "tax season", "easter", "outdoor activities"],
+    5: ["mother's day", "summer prep", "gardening", "outdoor"],
+    6: ["summer", "vacation planning", "father's day", "graduation"],
+    7: ["summer activities", "travel", "outdoor", "mid-year review"],
+    8: ["back to school", "end of summer", "preparation", "planning"],
+    9: ["fall", "back to school", "new beginnings", "autumn"],
+    10: ["fall activities", "halloween", "preparation", "cozy season"],
+    11: ["thanksgiving", "black friday", "holiday prep", "gratitude"],
+    12: ["holidays", "year-end", "christmas", "new year prep", "gift guides"]
+}
+
 
 class Default(WorkerEntrypoint):
     """Main worker entrypoint for SEO content generation."""
@@ -256,6 +296,79 @@ class Default(WorkerEntrypoint):
                     key, value = param.split("=", 1)
                     params[key] = value
         return params
+
+    def select_api_provider(
+        self,
+        website: dict,
+        openai_key: str,
+        anthropic_key: str,
+        purpose: str = "article"
+    ) -> tuple:
+        """Select API provider with rotation support.
+
+        Supports three modes:
+        - 'openai_only': Always use OpenAI
+        - 'anthropic_only': Always use Anthropic
+        - 'rotate': Alternate between APIs for variety (default)
+
+        Returns: (api_type, api_key) tuple
+        """
+        api_preference = website.get("api_rotation_mode", "rotate")
+        last_api_used = website.get("last_api_used")
+
+        # Determine available APIs
+        has_openai = openai_key is not None
+        has_anthropic = anthropic_key is not None
+
+        if not has_openai and not has_anthropic:
+            return (None, None)
+
+        # Handle specific preferences
+        if api_preference == "openai_only" and has_openai:
+            return ("openai", openai_key)
+        elif api_preference == "anthropic_only" and has_anthropic:
+            return ("claude", anthropic_key)
+
+        # Rotation mode (default)
+        if api_preference == "rotate" and has_openai and has_anthropic:
+            # Alternate based on last API used
+            if last_api_used == "openai":
+                selected = ("claude", anthropic_key)
+            elif last_api_used == "claude":
+                selected = ("openai", openai_key)
+            else:
+                # Random initial selection for variety
+                selected = random.choice([
+                    ("openai", openai_key),
+                    ("claude", anthropic_key)
+                ])
+
+            console.log(f"API rotation: last={last_api_used}, selected={selected[0]} for {purpose}")
+            return selected
+
+        # Fallback: use whatever is available
+        if has_openai:
+            return ("openai", openai_key)
+        return ("claude", anthropic_key)
+
+    def get_current_seasonal_themes(self) -> list:
+        """Get seasonal themes for the current month."""
+        current_month = datetime.now().month
+        return SEASONAL_THEMES.get(current_month, [])
+
+    def classify_search_intent(self, topic_title: str, keywords: list = None) -> str:
+        """Classify the search intent of a topic for GEO optimization."""
+        text_to_check = topic_title.lower()
+        if keywords:
+            text_to_check += " " + " ".join(keywords).lower()
+
+        for intent, config in SEARCH_INTENTS.items():
+            for signal in config["signals"]:
+                if signal in text_to_check:
+                    return intent
+
+        # Default to informational (best for GEO)
+        return "informational"
 
     async def on_fetch(self, request):
         """Handle HTTP requests (for manual triggers and health checks)."""
@@ -451,17 +564,40 @@ class Default(WorkerEntrypoint):
             website_id, topic.get("id"), supabase_url, supabase_key
         )
 
-        # Generate article
-        api_used = "openai" if openai_key else "claude"
-        api_key = openai_key if openai_key else anthropic_key
+        # Generate article with API rotation
+        api_used, api_key = self.select_api_provider(
+            website, openai_key, anthropic_key, purpose="article"
+        )
 
+        if not api_key:
+            console.log("No API key available after selection")
+            return False
+
+        # Try primary API, fallback to other if it fails
         article = await self.generate_article(topic, website, api_used, api_key)
+
+        # Fallback: try the other API if primary fails
+        if not article:
+            fallback_api = "claude" if api_used == "openai" else "openai"
+            fallback_key = anthropic_key if api_used == "openai" else openai_key
+
+            if fallback_key:
+                console.log(f"Primary API ({api_used}) failed, trying fallback ({fallback_api})")
+                article = await self.generate_article(topic, website, fallback_api, fallback_key)
+                if article:
+                    api_used = fallback_api  # Update for logging
 
         if not article:
             await self.update_generation_log(
-                log_id, "failed", "Content generation failed", supabase_url, supabase_key
+                log_id, "failed", "Content generation failed (both APIs)", supabase_url, supabase_key
             )
             return False
+
+        # Classify search intent for GEO tracking
+        article["search_intent"] = self.classify_search_intent(
+            topic.get("title", ""),
+            topic.get("keywords", [])
+        )
 
         article = self.optimize_seo(article, website)
 
@@ -484,14 +620,15 @@ class Default(WorkerEntrypoint):
         # Mark topic as used (with times_used increment)
         await self.mark_topic_used(topic.get("id"), website, supabase_url, supabase_key)
 
-        # Update schedule with time variation and format tracking
+        # Update schedule with time variation, format tracking, and API rotation
         await self.update_website_schedule(
             website_id,
             website.get("days_between_posts", 3),
             supabase_url,
             supabase_key,
             website=website,
-            content_format=article.get("content_format")
+            content_format=article.get("content_format"),
+            api_used=api_used
         )
 
         console.log(f"Successfully generated: {article.get('title')} (format: {article.get('content_format', 'default')})")
@@ -664,7 +801,7 @@ Return ONLY a JSON object (no markdown, no code blocks):
         supabase_url: str,
         supabase_key: str
     ) -> Optional[dict]:
-        """Save a generated topic to the database."""
+        """Save a generated topic to the database with enhanced metadata for SEO/GEO."""
         data = {
             "website_id": website_id,
             "title": topic.get("title"),
@@ -674,7 +811,11 @@ Return ONLY a JSON object (no markdown, no code blocks):
             "source": topic.get("source", "ai_generated"),
             "is_used": False,
             "times_used": 0,
-            "discovery_context": topic.get("discovery_context", {})
+            "discovery_context": topic.get("discovery_context", {}),
+            # Enhanced SEO/GEO fields
+            "format_type": topic.get("format_type"),
+            "timeliness": topic.get("timeliness", "evergreen"),
+            "trending_reason": topic.get("trending_reason")
         }
 
         headers = {
@@ -783,9 +924,12 @@ Return ONLY a JSON object (no markdown, no code blocks):
             all_topics.extend(google_topics)
             console.log(f"Found {len(google_topics)} topics from Google Search")
 
-        # 2. Generate AI topics with context
+        # 2. Generate AI topics with enhanced context for SEO and GEO
+        seasonal_themes = self.get_current_seasonal_themes()
+        seasonal_hint = f"- Current Season Themes: {', '.join(seasonal_themes[:5])}" if seasonal_themes else ""
+
         if scan_data and scan_data.get("niche_description"):
-            prompt = f"""Find 5 trending blog topics for this website.
+            prompt = f"""Find 5 highly-targeted blog topics for this website optimized for both Google SEO and AI search engines (ChatGPT, Perplexity, Gemini).
 
 WEBSITE CONTEXT (from actual website scan):
 - Website Name: {website.get('name')}
@@ -794,27 +938,52 @@ WEBSITE CONTEXT (from actual website scan):
 - Main Themes: {', '.join(scan_data.get('content_themes', [])[:5])}
 - Key Topics Found: {', '.join(scan_data.get('main_keywords', [])[:15])}
 - Sample Headings: {', '.join(scan_data.get('headings', [])[:8])}
+{seasonal_hint}
 
-IMPORTANT: Topics MUST be relevant to the actual website content described above.
-Do NOT generate generic topics based only on the domain name.
+TOPIC REQUIREMENTS:
+1. Each topic MUST be directly relevant to the scanned website content
+2. Include long-tail keywords (3-5 words) that are easier to rank for
+3. Mix of search intents: informational (how-to, what-is), commercial (best, reviews), and transactional
+4. Consider seasonal relevance where appropriate
+5. Titles should be question-based or list-based (great for GEO/AI search)
 
 Language: {website.get('language', 'en-US')}
 
 Return ONLY a JSON object (no markdown):
-{{"topics": [{{"title": "Title", "keywords": ["kw1", "kw2"], "category": "cat", "priority": 7}}]}}"""
+{{"topics": [{{
+  "title": "How to [Action] for [Specific Outcome]",
+  "keywords": ["long-tail keyword 1", "keyword 2", "keyword 3"],
+  "category": "category_name",
+  "priority": 7,
+  "search_intent": "informational|commercial|transactional|navigational",
+  "timeliness": "evergreen|seasonal|news|trending",
+  "format_hint": "listicle|how_to_guide|deep_dive|comparison|case_study|qa_interview|news_commentary|ultimate_guide",
+  "trending_reason": "Why this topic is relevant now (or null if evergreen)"
+}}]}}"""
         else:
             # Fallback to basic prompt without scan data
-            prompt = f"""Find 5 trending blog topics for a website about: {website.get('name')}
+            prompt = f"""Find 5 highly-targeted blog topics for a website about: {website.get('name')}
 Domain: {website.get('domain')}
 Language: {website.get('language', 'en-US')}
+{seasonal_hint}
 
-Topics should be:
-- Current and trending
-- SEO-optimized
-- Relevant to the website's niche
+TOPIC REQUIREMENTS:
+1. Long-tail keywords (3-5 words) that are easier to rank for
+2. Mix of search intents: informational, commercial, transactional
+3. Question-based or list-based titles (great for AI search engines)
+4. Consider seasonal relevance where appropriate
 
 Return ONLY a JSON object (no markdown):
-{{"topics": [{{"title": "Title", "keywords": ["kw1", "kw2"], "category": "cat", "priority": 7}}]}}"""
+{{"topics": [{{
+  "title": "How to [Action] for [Specific Outcome]",
+  "keywords": ["long-tail keyword 1", "keyword 2", "keyword 3"],
+  "category": "category_name",
+  "priority": 7,
+  "search_intent": "informational|commercial|transactional|navigational",
+  "timeliness": "evergreen|seasonal|news|trending",
+  "format_hint": "listicle|how_to_guide|deep_dive|comparison|case_study|qa_interview|news_commentary|ultimate_guide",
+  "trending_reason": "Why this topic is relevant now (or null if evergreen)"
+}}]}}"""
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -849,14 +1018,35 @@ Return ONLY a JSON object (no markdown):
                 result = json.loads(content)
                 ai_topics = result.get("topics", [])
 
-                # Add discovery context and source to AI topics
+                # Add discovery context, source, and enhanced metadata to AI topics
                 for topic in ai_topics:
                     topic["source"] = "ai_suggested"
+
+                    # Map format_hint to format_type (database column name)
+                    if topic.get("format_hint"):
+                        topic["format_type"] = topic.pop("format_hint")
+
+                    # Validate and set search intent
+                    valid_intents = ["informational", "commercial", "transactional", "navigational"]
+                    if topic.get("search_intent") not in valid_intents:
+                        # Auto-classify if AI didn't provide valid intent
+                        topic["search_intent"] = self.classify_search_intent(
+                            topic.get("title", ""),
+                            topic.get("keywords", [])
+                        )
+
+                    # Validate timeliness
+                    valid_timeliness = ["evergreen", "seasonal", "news", "trending"]
+                    if topic.get("timeliness") not in valid_timeliness:
+                        topic["timeliness"] = "evergreen"
+
+                    # Build discovery context
                     if scan_data:
                         topic["discovery_context"] = {
                             "used_scan_data": True,
                             "niche": scan_data.get("niche_description"),
-                            "themes_used": scan_data.get("content_themes", [])[:3]
+                            "themes_used": scan_data.get("content_themes", [])[:3],
+                            "search_intent": topic.get("search_intent")
                         }
 
                 # Save AI-generated topics
@@ -1116,6 +1306,64 @@ Return ONLY a JSON object (no markdown):
 
         return "\n".join(instructions)
 
+    def _get_geo_instructions(self, topic: dict) -> str:
+        """Get instructions for GEO (Generative Engine Optimization) - optimizing for AI search engines.
+
+        AI search engines like ChatGPT, Perplexity, and Gemini prefer:
+        - Clear, cite-able summaries
+        - Structured Q&A content
+        - Factual, authoritative information
+        - Easy-to-extract key points
+        """
+        search_intent = topic.get("discovery_context", {}).get("search_intent") or \
+                       self.classify_search_intent(topic.get("title", ""), topic.get("keywords", []))
+
+        instructions = [
+            "\nGEO OPTIMIZATION (For AI Search Engines like ChatGPT, Perplexity, Gemini):",
+            "",
+            "REQUIRED FOR AI CITATION:",
+            "- Start with a 40-60 word summary that directly answers the main question",
+            "- Include a clear FAQ section with 3-5 Q&A pairs at the end",
+            "- Format FAQs as: <h3>Question here?</h3> followed by <p>Direct answer...</p>",
+            "- Use bullet points for lists of features, steps, or comparisons",
+            "- Include specific numbers, statistics, or data points where relevant",
+            "- Make key statements quotable (clear, standalone sentences)",
+            "",
+            "STRUCTURED CONTENT FOR AI PARSING:",
+            "- Use descriptive headings that could be questions: 'What is X?', 'How does X work?'",
+            "- Keep paragraphs focused on single concepts (easier for AI to extract)",
+            "- Include a 'Key Takeaways' or 'Summary' section with 3-5 bullet points",
+            "- Define terms when introducing them (AI citation-friendly)",
+        ]
+
+        # Add intent-specific guidance
+        if search_intent == "informational":
+            instructions.extend([
+                "",
+                "INFORMATIONAL INTENT OPTIMIZATION:",
+                "- Lead with the direct answer, then expand",
+                "- Include 'What is', 'How to', 'Why' structured sections",
+                "- Add a step-by-step process where applicable"
+            ])
+        elif search_intent == "commercial":
+            instructions.extend([
+                "",
+                "COMMERCIAL INTENT OPTIMIZATION:",
+                "- Include comparison criteria and clear recommendations",
+                "- List pros/cons in structured format",
+                "- Add a 'Best for...' or 'Verdict' section"
+            ])
+        elif search_intent == "transactional":
+            instructions.extend([
+                "",
+                "TRANSACTIONAL INTENT OPTIMIZATION:",
+                "- Highlight key features and benefits early",
+                "- Include clear call-to-action elements",
+                "- Add pricing or value comparison if relevant"
+            ])
+
+        return "\n".join(instructions)
+
     def build_prompt(self, topic: dict, website: dict, content_format: dict = None) -> str:
         """Build the content generation prompt with dynamic format and genuineness."""
         keywords = ", ".join(topic.get("keywords", [])) if topic.get("keywords") else ""
@@ -1135,6 +1383,7 @@ Return ONLY a JSON object (no markdown):
         heading_instructions = self._get_heading_style_instructions(content_format.get("heading_style", "descriptive"))
         tone_instructions = self._get_tone_instructions(content_format.get("tone", "conversational"), voice_style)
         genuineness_instructions = self._get_genuineness_instructions(website)
+        geo_instructions = self._get_geo_instructions(topic)
 
         return f"""Write a {content_format['name']} style blog article.
 
@@ -1152,6 +1401,7 @@ HEADING STYLE:
 TONE & VOICE:
 {tone_instructions}
 {genuineness_instructions}
+{geo_instructions}
 
 CRITICAL FORMATTING RULES:
 - Output ONLY the article content - no wrapper or meta text
@@ -1302,22 +1552,194 @@ Writing rules:
         }
 
     def optimize_seo(self, article: dict, website: dict) -> dict:
-        """Apply SEO optimizations to the article."""
-        meta_desc = article.get("excerpt", "")[:160]
+        """Apply comprehensive SEO and GEO optimizations to the article.
 
-        score = 50
-        if article.get("title") and len(article["title"]) >= 30:
-            score += 10
-        if article.get("primary_keyword") and article["primary_keyword"].lower() in article.get("title", "").lower():
-            score += 15
-        if article.get("word_count", 0) >= 1000:
-            score += 15
-        if article.get("excerpt"):
-            score += 10
+        Scoring factors (total possible: 100):
+        - Title optimization: 20 points
+        - Content length & structure: 25 points
+        - Meta data: 15 points
+        - Keywords: 15 points
+        - GEO factors (AI search readiness): 25 points
+        """
+        import re
+        content = article.get("content", "")
+        title = article.get("title", "")
+        excerpt = article.get("excerpt", "")
+        primary_keyword = article.get("primary_keyword", "")
+        word_count = article.get("word_count", 0)
 
+        score = 0
+        scoring_breakdown = {}
+
+        # === TITLE OPTIMIZATION (20 points) ===
+        title_score = 0
+        if title:
+            # Title length (optimal: 50-60 chars for SERP display)
+            title_len = len(title)
+            if 50 <= title_len <= 60:
+                title_score += 8
+            elif 30 <= title_len < 50 or 60 < title_len <= 70:
+                title_score += 5
+            elif title_len >= 20:
+                title_score += 2
+
+            # Keyword in title (front-loaded is better)
+            if primary_keyword and primary_keyword.lower() in title.lower():
+                keyword_pos = title.lower().find(primary_keyword.lower())
+                if keyword_pos < len(title) // 3:  # In first third
+                    title_score += 8
+                else:
+                    title_score += 5
+
+            # Power words in title (engagement boosters)
+            power_words = ["how", "why", "what", "best", "guide", "top", "ultimate", "essential", "complete"]
+            if any(word in title.lower() for word in power_words):
+                title_score += 4
+
+        scoring_breakdown["title"] = title_score
+        score += title_score
+
+        # === CONTENT LENGTH & STRUCTURE (25 points) ===
+        structure_score = 0
+
+        # Word count (optimal: 1200-2500 for most topics)
+        if word_count >= 1500:
+            structure_score += 8
+        elif word_count >= 1000:
+            structure_score += 5
+        elif word_count >= 600:
+            structure_score += 2
+
+        # Heading structure
+        h2_count = len(re.findall(r'<h2[^>]*>', content, re.IGNORECASE))
+        h3_count = len(re.findall(r'<h3[^>]*>', content, re.IGNORECASE))
+
+        if h2_count >= 3:
+            structure_score += 5
+        elif h2_count >= 2:
+            structure_score += 3
+
+        if h3_count >= 2:
+            structure_score += 4
+        elif h3_count >= 1:
+            structure_score += 2
+
+        # Lists presence (good for readability and featured snippets)
+        has_ul = '<ul' in content.lower()
+        has_ol = '<ol' in content.lower()
+        if has_ul or has_ol:
+            structure_score += 4
+
+        # Paragraph variety (not all same length)
+        paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', content, re.DOTALL | re.IGNORECASE)
+        if len(paragraphs) >= 5:
+            structure_score += 4
+        elif len(paragraphs) >= 3:
+            structure_score += 2
+
+        scoring_breakdown["structure"] = structure_score
+        score += structure_score
+
+        # === META DATA (15 points) ===
+        meta_score = 0
+
+        # Meta description
+        meta_desc = excerpt[:160] if excerpt else ""
+        if meta_desc:
+            meta_len = len(meta_desc)
+            if 120 <= meta_len <= 160:
+                meta_score += 8
+            elif 80 <= meta_len < 120:
+                meta_score += 5
+            else:
+                meta_score += 2
+
+            # Keyword in meta description
+            if primary_keyword and primary_keyword.lower() in meta_desc.lower():
+                meta_score += 4
+
+        # Has excerpt/summary
+        if excerpt and len(excerpt) >= 50:
+            meta_score += 3
+
+        scoring_breakdown["meta"] = meta_score
+        score += meta_score
+
+        # === KEYWORD OPTIMIZATION (15 points) ===
+        keyword_score = 0
+
+        if primary_keyword and content:
+            # Keyword density (optimal: 1-2%)
+            keyword_lower = primary_keyword.lower()
+            content_lower = content.lower()
+            keyword_count = content_lower.count(keyword_lower)
+            words_in_content = len(content.split())
+
+            if words_in_content > 0:
+                density = (keyword_count * len(keyword_lower.split())) / words_in_content * 100
+                if 0.5 <= density <= 2.5:
+                    keyword_score += 8
+                elif 0.2 <= density < 0.5 or 2.5 < density <= 4:
+                    keyword_score += 4
+
+            # Keyword in first paragraph
+            first_para_match = re.search(r'<p[^>]*>(.*?)</p>', content, re.DOTALL | re.IGNORECASE)
+            if first_para_match and keyword_lower in first_para_match.group(1).lower():
+                keyword_score += 4
+
+            # Keyword in headings
+            heading_text = " ".join(re.findall(r'<h[23][^>]*>(.*?)</h[23]>', content, re.IGNORECASE))
+            if keyword_lower in heading_text.lower():
+                keyword_score += 3
+
+        scoring_breakdown["keywords"] = keyword_score
+        score += keyword_score
+
+        # === GEO FACTORS - AI SEARCH READINESS (25 points) ===
+        geo_score = 0
+
+        # FAQ section presence (critical for AI citations)
+        has_faq = bool(re.search(r'<h[23][^>]*>[^<]*(?:FAQ|Frequently Asked|Questions)[^<]*</h[23]>', content, re.IGNORECASE))
+        has_question_headings = len(re.findall(r'<h[23][^>]*>[^<]*\?</h[23]>', content)) >= 2
+
+        if has_faq:
+            geo_score += 8
+        elif has_question_headings:
+            geo_score += 5
+
+        # Summary/Key Takeaways section
+        has_summary = bool(re.search(r'<h[23][^>]*>[^<]*(?:Summary|Key Takeaways|Conclusion|TL;DR)[^<]*</h[23]>', content, re.IGNORECASE))
+        if has_summary:
+            geo_score += 5
+
+        # Structured bullet points (easy for AI to extract)
+        bullet_points = len(re.findall(r'<li[^>]*>', content))
+        if bullet_points >= 5:
+            geo_score += 5
+        elif bullet_points >= 3:
+            geo_score += 3
+
+        # Clear, quotable statements (sentences ending with period after specific words)
+        # Look for definitional patterns: "X is", "X means", "X refers to"
+        definitional_patterns = len(re.findall(r'(?:is|means|refers to|defined as)[^.]{20,100}\.', content))
+        if definitional_patterns >= 2:
+            geo_score += 4
+        elif definitional_patterns >= 1:
+            geo_score += 2
+
+        # Has numbers/statistics (AI loves citing specific data)
+        has_numbers = bool(re.search(r'\d+(?:\.\d+)?(?:%|percent|times|x|hours|days|years)', content, re.IGNORECASE))
+        if has_numbers:
+            geo_score += 3
+
+        scoring_breakdown["geo"] = geo_score
+        score += geo_score
+
+        # Set article properties
         article["meta_description"] = meta_desc
         article["seo_score"] = min(100, score)
-        article["geo_optimized"] = True
+        article["seo_breakdown"] = scoring_breakdown
+        article["geo_optimized"] = geo_score >= 15  # True if GEO score is good
 
         return article
 
@@ -1573,9 +1995,10 @@ Writing rules:
         supabase_url: str,
         supabase_key: str,
         website: dict = None,
-        content_format: str = None
+        content_format: str = None,
+        api_used: str = None
     ):
-        """Update website schedule after generation with time variation and format tracking."""
+        """Update website schedule after generation with time variation, format tracking, and API rotation."""
         now = datetime.now()
 
         # Calculate next schedule with variation if website config provided
@@ -1595,6 +2018,10 @@ Writing rules:
                 "last_posting_hour": current_hour,
                 "format_history": format_history
             }
+
+            # Track last API used for rotation
+            if api_used:
+                data["last_api_used"] = api_used
         else:
             # Fallback to simple scheduling
             next_scheduled = now + timedelta(days=days)
@@ -1602,6 +2029,8 @@ Writing rules:
                 "last_generated_at": now.isoformat(),
                 "next_scheduled_at": next_scheduled.isoformat(),
             }
+            if api_used:
+                data["last_api_used"] = api_used
 
         headers = {
             "apikey": supabase_key,
