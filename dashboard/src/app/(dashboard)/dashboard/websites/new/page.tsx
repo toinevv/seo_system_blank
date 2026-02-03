@@ -257,24 +257,46 @@ export default function NewWebsitePage() {
 
     try {
       const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || "https://seo-content-generator.ta-voeten.workers.dev";
+
+      // Create an AbortController for timeout (90 seconds should be plenty)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log("Preview scan: timeout reached, aborting");
+        controller.abort();
+      }, 90000);
+
+      console.log("Preview scan: fetching", `${workerUrl}/scan-preview?domain=${encodeURIComponent(cleanDomain)}`);
+
       const response = await fetch(`${workerUrl}/scan-preview?domain=${encodeURIComponent(cleanDomain)}`, {
         method: "POST",
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+      console.log("Preview scan: got response", response.status, response.statusText);
 
       if (response.ok) {
         const result = await response.json();
+        console.log("Preview scan: parsed result", result);
         if (result.success && result.data) {
           setPreviewScanData(result.data);
           setPreviewScanStatus("done");
           console.log("Preview scan complete:", result.data);
         } else {
+          console.log("Preview scan: response not successful", result);
           setPreviewScanStatus("error");
         }
       } else {
+        const errorText = await response.text();
+        console.error("Preview scan: HTTP error", response.status, errorText);
         setPreviewScanStatus("error");
       }
     } catch (err) {
-      console.error("Preview scan error:", err);
+      if (err instanceof Error && err.name === "AbortError") {
+        console.error("Preview scan: timed out after 90 seconds");
+      } else {
+        console.error("Preview scan error:", err);
+      }
       setPreviewScanStatus("error");
     }
   };

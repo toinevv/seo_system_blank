@@ -417,12 +417,22 @@ class Default(WorkerEntrypoint):
                     # URL decode the domain
                     from urllib.parse import unquote
                     domain = unquote(domain)
+                    console.log(f"scan-preview: Starting for domain {domain}")
                     result = await self.scan_preview(domain)
+                    console.log(f"scan-preview: Completed, success={result.get('success')}")
                 else:
                     result = {"error": "domain parameter required", "success": False}
-                return Response(json.dumps(result), headers={
+                    console.log("scan-preview: No domain provided")
+
+                # Serialize the response
+                response_body = json.dumps(result)
+                console.log(f"scan-preview: Sending response ({len(response_body)} bytes)")
+
+                return Response(response_body, headers={
                     "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"  # Allow CORS for preview
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization"
                 })
 
             if "/scan" in url:
@@ -442,9 +452,16 @@ class Default(WorkerEntrypoint):
 
         except Exception as e:
             console.log(f"Request error: {str(e)}")
-            return Response(json.dumps({"error": str(e)}),
+            import traceback
+            console.log(f"Traceback: {traceback.format_exc()}")
+            return Response(json.dumps({"error": str(e), "success": False}),
                           status=500,
-                          headers={"Content-Type": "application/json"})
+                          headers={
+                              "Content-Type": "application/json",
+                              "Access-Control-Allow-Origin": "*",
+                              "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                              "Access-Control-Allow-Headers": "Content-Type, Authorization"
+                          })
 
     async def scheduled(self, event, env, ctx):
         """Handle cron trigger - runs every hour."""
