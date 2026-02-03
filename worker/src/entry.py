@@ -1236,19 +1236,33 @@ Return ONLY a JSON object (no markdown):
 
         return "\n".join(instructions)
 
-    def _get_heading_style_instructions(self, heading_style: str) -> str:
-        """Get heading style instructions based on format type."""
-        styles = {
-            "numbered": "Use numbered headings: '1. First Point', '2. Second Point', etc.",
-            "step": "Use step-based headings: 'Step 1: [Action]', 'Step 2: [Action]', etc.",
-            "descriptive": "Use descriptive headings that summarize the section content",
-            "versus": "Use comparison headings: '[Option A] vs [Option B]', 'Feature Comparison', etc.",
-            "story": "Use narrative headings: 'The Challenge', 'The Approach', 'The Results', etc.",
-            "question": "Use question headings: 'What is...?', 'How does...?', 'Why should...?'",
-            "news": "Use journalistic headings: 'What Happened', 'Why It Matters', 'What's Next'",
-            "chapter": "Use chapter-style headings: 'Chapter 1: Getting Started', or 'Part 1: Fundamentals'"
-        }
-        return styles.get(heading_style, "Use clear, descriptive headings")
+    def _get_heading_style_instructions(self, heading_style: str, language: str = "en-US") -> str:
+        """Get heading style instructions based on format type and language."""
+        # Dutch translations for heading styles
+        if language.startswith("nl"):
+            styles = {
+                "numbered": "Gebruik genummerde koppen: '1. Eerste Punt', '2. Tweede Punt', etc.",
+                "step": "Gebruik stap-gebaseerde koppen: 'Stap 1: [Actie]', 'Stap 2: [Actie]', etc.",
+                "descriptive": "Gebruik beschrijvende koppen die de sectie-inhoud samenvatten",
+                "versus": "Gebruik vergelijkende koppen: '[Optie A] vs [Optie B]', 'Functievergelijking', etc.",
+                "story": "Gebruik verhalende koppen: 'De Uitdaging', 'De Aanpak', 'De Resultaten', etc.",
+                "question": "Gebruik vraag-koppen: 'Wat is...?', 'Hoe werkt...?', 'Waarom zou je...?'",
+                "news": "Gebruik journalistieke koppen: 'De Situatie', 'Waarom Dit Belangrijk Is', 'De Analyse', 'Mijn Visie', 'Wat Nu'",
+                "chapter": "Gebruik hoofdstuk-stijl koppen: 'Hoofdstuk 1: Aan de Slag', of 'Deel 1: De Basis'"
+            }
+        else:
+            # English (default)
+            styles = {
+                "numbered": "Use numbered headings: '1. First Point', '2. Second Point', etc.",
+                "step": "Use step-based headings: 'Step 1: [Action]', 'Step 2: [Action]', etc.",
+                "descriptive": "Use descriptive headings that summarize the section content",
+                "versus": "Use comparison headings: '[Option A] vs [Option B]', 'Feature Comparison', etc.",
+                "story": "Use narrative headings: 'The Challenge', 'The Approach', 'The Results', etc.",
+                "question": "Use question headings: 'What is...?', 'How does...?', 'Why should...?'",
+                "news": "Use journalistic headings: 'What Happened', 'Why It Matters', 'What's Next'",
+                "chapter": "Use chapter-style headings: 'Chapter 1: Getting Started', or 'Part 1: Fundamentals'"
+            }
+        return styles.get(heading_style, styles.get("descriptive", "Use clear, descriptive headings"))
 
     def _get_tone_instructions(self, tone: str, voice_style: str) -> str:
         """Get tone and voice instructions based on format and website config."""
@@ -1397,7 +1411,10 @@ Return ONLY a JSON object (no markdown):
             content_format,
             website.get('language', 'en-US')
         )
-        heading_instructions = self._get_heading_style_instructions(content_format.get("heading_style", "descriptive"))
+        heading_instructions = self._get_heading_style_instructions(
+            content_format.get("heading_style", "descriptive"),
+            website.get('language', 'en-US')
+        )
         tone_instructions = self._get_tone_instructions(content_format.get("tone", "conversational"), voice_style)
         genuineness_instructions = self._get_genuineness_instructions(website)
         geo_instructions = self._get_geo_instructions(topic)
@@ -1514,38 +1531,471 @@ Writing rules:
 
         return content
 
+    # =============================================
+    # TITLE OPTIMIZATION
+    # =============================================
+
+    def _optimize_title(self, title: str, topic: dict, website: dict) -> str:
+        """Optimize title for SEO (50-60 characters) without extracting from AI content.
+
+        - Always uses topic.title as base
+        - Adds current year if room and not present
+        - Ensures primary keyword is present if possible
+        """
+        if not title:
+            title = topic.get("title", "Untitled")
+
+        current_year = datetime.now().year
+        keywords = topic.get("keywords", [])
+        primary_keyword = keywords[0] if keywords else ""
+
+        # If title is too long, shorten it while keeping words intact
+        if len(title) > 60:
+            words = title.split()
+            shortened = ""
+            for word in words:
+                test_title = f"{shortened} {word}".strip()
+                if len(test_title) <= 55:  # Leave room for year
+                    shortened = test_title
+                else:
+                    break
+            title = shortened if shortened else words[0][:55]
+
+        # Add year if not present and there's room
+        if str(current_year) not in title and len(title) <= 50:
+            title = f"{title} {current_year}"
+
+        # Ensure primary keyword is present (if there's room)
+        if primary_keyword and primary_keyword.lower() not in title.lower():
+            if len(f"{title} - {primary_keyword}") <= 65:
+                title = f"{title} - {primary_keyword}"
+
+        return title.strip()
+
+    # =============================================
+    # GEO ELEMENT EXTRACTION
+    # =============================================
+
+    def _extract_geo_elements(self, content: str, language: str = "en-US") -> dict:
+        """Extract all GEO elements from generated content."""
+        return {
+            "tldr": self._extract_tldr(content, language),
+            "faq_items": self._extract_faq_items(content, language),
+            "cited_statistics": self._extract_statistics(content, language),
+            "citations": self._extract_citations(content, language),
+        }
+
+    def _extract_tldr(self, content: str, language: str = "en-US") -> str:
+        """Extract TL;DR summary from content (40-80 words optimal for AI search)."""
+        import re
+
+        # Pattern 1: Look for TL;DR in div with class
+        tldr_div_match = re.search(
+            r'<div[^>]*class=["\']tldr["\'][^>]*>.*?<strong>TL;DR:?</strong>\s*(.*?)</div>',
+            content, re.IGNORECASE | re.DOTALL
+        )
+        if tldr_div_match:
+            tldr = re.sub(r'<[^>]+>', '', tldr_div_match.group(1)).strip()
+            if tldr:
+                words = tldr.split()
+                return ' '.join(words[:80]) if len(words) > 80 else tldr
+
+        # Pattern 2: Look for TL;DR/Samenvatting header followed by content
+        if language.startswith("nl"):
+            tldr_patterns = [
+                r'(?:TL;DR|TLDR|Samenvatting|Korte samenvatting)[:\s]+([^<]+?)(?=<h[23]|<p>|\n\n|$)',
+                r'<strong>(?:TL;DR|Samenvatting)[:\s]*</strong>\s*([^<]+?)(?=<h|<p>|$)',
+                r'<h[23][^>]*>(?:TL;DR|Samenvatting)</h[23]>\s*<p>([^<]+)</p>',
+            ]
+        else:
+            tldr_patterns = [
+                r'(?:TL;DR|TLDR|Summary|Executive Summary)[:\s]+([^<]+?)(?=<h[23]|<p>|\n\n|$)',
+                r'<strong>(?:TL;DR|Summary)[:\s]*</strong>\s*([^<]+?)(?=<h|<p>|$)',
+                r'<h[23][^>]*>(?:TL;DR|Summary|Executive Summary)</h[23]>\s*<p>([^<]+)</p>',
+            ]
+
+        for pattern in tldr_patterns:
+            match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
+            if match:
+                tldr = re.sub(r'<[^>]+>', '', match.group(1)).strip()
+                if len(tldr) > 30:  # Minimum viable TL;DR
+                    words = tldr.split()
+                    return ' '.join(words[:80]) if len(words) > 80 else tldr
+
+        # Pattern 3: Fall back to first paragraph if it's summary-like (starts with topic mention)
+        first_para = re.search(r'<p>([^<]{50,300})</p>', content)
+        if first_para:
+            text = first_para.group(1).strip()
+            # Only use if it reads like a summary (not a question or narrative opening)
+            if not text.endswith('?') and not text.startswith(('When', 'Once', 'Wanneer', 'Toen')):
+                words = text.split()
+                if 30 <= len(words) <= 100:
+                    return ' '.join(words[:75])
+
+        return None
+
+    def _extract_faq_items(self, content: str, language: str = "en-US") -> list:
+        """Extract FAQ Q&A pairs from content (3-5 items optimal for FAQPage schema)."""
+        import re
+        faq_items = []
+        seen_questions = set()
+
+        # Pattern 1: Look for faq-item divs (structured FAQ format)
+        faq_div_pattern = re.compile(
+            r'<div[^>]*class=["\']faq-item["\'][^>]*>.*?<strong>Q:\s*(.+?)\?*</strong>.*?(?:<p>)?A:\s*(.+?)(?:</p>)?</div>',
+            re.IGNORECASE | re.DOTALL
+        )
+        for match in faq_div_pattern.finditer(content):
+            question = re.sub(r'<[^>]+>', '', match.group(1)).strip()
+            answer = re.sub(r'<[^>]+>', '', match.group(2)).strip()
+            if question and answer and len(answer) > 20:
+                q_normalized = question.lower()
+                if q_normalized not in seen_questions:
+                    seen_questions.add(q_normalized)
+                    faq_items.append({
+                        "question": question + "?" if not question.endswith("?") else question,
+                        "answer": answer[:500]
+                    })
+
+        # Pattern 2: H3 questions followed by paragraphs (common AI output format)
+        if len(faq_items) < 3:
+            h3_qa_pattern = re.compile(
+                r'<h3[^>]*>([^<]*\?)</h3>\s*<p>([^<]+(?:<[^>]+>[^<]*</[^>]+>)*[^<]*)</p>',
+                re.IGNORECASE | re.DOTALL
+            )
+            for match in h3_qa_pattern.finditer(content):
+                question = match.group(1).strip()
+                answer = re.sub(r'<[^>]+>', '', match.group(2)).strip()
+                if question and answer and len(answer) > 20:
+                    q_normalized = question.lower()
+                    if q_normalized not in seen_questions:
+                        seen_questions.add(q_normalized)
+                        faq_items.append({
+                            "question": question,
+                            "answer": answer[:500]
+                        })
+
+        # Pattern 3: Q/A format without HTML structure (Dutch: Vraag/Antwoord)
+        if len(faq_items) < 3:
+            if language.startswith("nl"):
+                qa_pattern = re.compile(
+                    r'(?:Q:|Vraag:?)\s*(.+?)\??\s*(?:\n|\s)*(?:A:|Antwoord:?)\s*(.+?)(?=Q:|Vraag:|<h|$)',
+                    re.IGNORECASE | re.DOTALL
+                )
+            else:
+                qa_pattern = re.compile(
+                    r'Q:\s*(.+?)\??\s*(?:\n|\s)*A:\s*(.+?)(?=Q:|<h|$)',
+                    re.IGNORECASE | re.DOTALL
+                )
+            for match in qa_pattern.finditer(content):
+                question = re.sub(r'<[^>]+>', '', match.group(1)).strip()
+                answer = re.sub(r'<[^>]+>', '', match.group(2)).strip()
+                if question and answer and len(answer) > 20:
+                    q_normalized = question.lower()
+                    if q_normalized not in seen_questions:
+                        seen_questions.add(q_normalized)
+                        faq_items.append({
+                            "question": question + "?" if not question.endswith("?") else question,
+                            "answer": answer[:500]
+                        })
+
+        return faq_items[:5]  # Limit to 5 FAQ items
+
+    def _extract_statistics(self, content: str, language: str = "en-US") -> list:
+        """Extract statistics with source attribution from content."""
+        import re
+        statistics = []
+        seen_stats = set()
+
+        # Strip HTML tags for easier pattern matching
+        text_content = re.sub(r'<[^>]+>', ' ', content)
+        text_content = re.sub(r'\s+', ' ', text_content)
+
+        # Language-specific patterns
+        if language.startswith("nl"):
+            stat_patterns = [
+                # "Volgens [Source], X%..."
+                (r'[Vv]olgens\s+([^,]+?),?\s+(.{10,100}?(?:\d+[%€]|\d+\s*procent).{0,50}?)(?:\.|$)', 1, 2),
+                # "Onderzoek van [Source] toont aan dat X%..."
+                (r'[Oo]nderzoek\s+(?:van|door)\s+([^,]+?)\s+(?:toont aan|laat zien)\s+(?:dat\s+)?(.{10,100}?(?:\d+[%€]).{0,50}?)(?:\.|$)', 1, 2),
+                # "X% volgens [Source]"
+                (r'(\d+[%€][^,\.]{5,80}?)\s+(?:volgens|aldus)\s+([^,\.]{3,50})', 2, 1),
+                # "Gemiddeld X per [Source]"
+                (r'[Gg]emiddeld\s+(.{5,60}?(?:\d+[%€]).{0,40}?)\s+(?:volgens)\s+([^,\.]{3,50})', 2, 1),
+            ]
+        else:
+            stat_patterns = [
+                # "According to [Source], X%..."
+                (r'[Aa]ccording to\s+([^,]+?),?\s+(.{10,100}?(?:\d+[%$€]|\d+\s*percent).{0,50}?)(?:\.|$)', 1, 2),
+                # "Research by [Source] shows that X%..."
+                (r'[Rr]esearch\s+(?:by|from)\s+([^,]+?)\s+(?:shows|indicates|found)\s+(?:that\s+)?(.{10,100}?(?:\d+[%$€]).{0,50}?)(?:\.|$)', 1, 2),
+                # "X% according to [Source]"
+                (r'(\d+[%$€][^,\.]{5,80}?)\s+(?:according to|per)\s+([^,\.]{3,50})', 2, 1),
+                # "On average, X per [Source]"
+                (r'[Oo]n average,?\s+(.{5,60}?(?:\d+[%$€]).{0,40}?)\s+(?:according to)\s+([^,\.]{3,50})', 2, 1),
+            ]
+
+        for pattern, source_group, stat_group in stat_patterns:
+            matches = re.finditer(pattern, text_content)
+            for match in matches:
+                source = match.group(source_group).strip()
+                stat = match.group(stat_group).strip()
+
+                # Skip if already seen similar statistic
+                stat_key = stat[:30].lower()
+                if stat_key in seen_stats:
+                    continue
+                seen_stats.add(stat_key)
+
+                # Clean up source
+                source = re.sub(r'^(a|an|the|de|het|een)\s+', '', source, flags=re.IGNORECASE).strip()
+
+                if len(stat) > 10 and len(source) > 2:
+                    statistics.append({
+                        "statistic": stat[:200],
+                        "source": source[:100]
+                    })
+
+        return statistics[:10]  # Limit to 10 statistics
+
+    def _extract_citations(self, content: str, language: str = "en-US") -> list:
+        """Extract expert quotes and citations from content."""
+        import re
+        citations = []
+        seen_quotes = set()
+
+        # Strip HTML tags for easier pattern matching
+        text_content = re.sub(r'<[^>]+>', ' ', content)
+        text_content = re.sub(r'\s+', ' ', text_content)
+
+        # Language-specific patterns for expert quotes
+        if language.startswith("nl"):
+            quote_patterns = [
+                # "Zoals [Expert] stelt: '[quote]'"
+                (r'[Zz]oals\s+([^,]+?)\s+(?:stelt|zegt|benadrukt)[:\s]+["\'](.{20,200}?)["\']', 1, 2),
+                # "[Expert] zegt: '[quote]'"
+                (r'([A-Z][a-zA-Z\s]{2,30}?)\s+(?:zegt|stelt|verklaart)[:\s]+["\'](.{20,200}?)["\']', 1, 2),
+                # "'[quote]' - [Expert]"
+                (r'["\']([^"\']{20,200})["\'](?:\s*[-–—]\s*|\s+aldus\s+)([A-Z][^,\.]{3,40})', 2, 1),
+            ]
+        else:
+            quote_patterns = [
+                # "As [Expert] states: '[quote]'"
+                (r'[Aa]s\s+([^,]+?)\s+(?:states|notes|says|explains)[:\s]+["\'](.{20,200}?)["\']', 1, 2),
+                # "[Expert] says: '[quote]'"
+                (r'([A-Z][a-zA-Z\s\.]{2,30}?)\s+(?:says|notes|explains|argues)[:\s]+["\'](.{20,200}?)["\']', 1, 2),
+                # "'[quote]' - [Expert]"
+                (r'["\']([^"\']{20,200})["\'](?:\s*[-–—]\s*|\s+according to\s+)([A-Z][^,\.]{3,40})', 2, 1),
+            ]
+
+        for pattern, source_group, quote_group in quote_patterns:
+            matches = re.finditer(pattern, text_content)
+            for match in matches:
+                source = match.group(source_group).strip()
+                quote = match.group(quote_group).strip()
+
+                # Skip if already seen similar quote
+                quote_key = quote[:30].lower()
+                if quote_key in seen_quotes:
+                    continue
+                seen_quotes.add(quote_key)
+
+                if len(quote) > 20 and len(source) > 2:
+                    citations.append({
+                        "quote": quote[:300],
+                        "source": source[:100],
+                        "type": "expert_quote"
+                    })
+
+        return citations[:5]  # Limit to 5 citations
+
+    # =============================================
+    # SCHEMA GENERATION
+    # =============================================
+
+    def _generate_schema_markup(self, article: dict, website: dict) -> dict:
+        """Generate JSON-LD schema markup for Article (enhances rich snippets in search)."""
+        current_date = datetime.now().isoformat()
+
+        # Build base URL
+        base_url = website.get("domain", "example.com")
+        if not base_url.startswith("http"):
+            base_url = f"https://{base_url}"
+
+        company_name = website.get("name", website.get("domain", "Company"))
+        author_name = article.get("author", company_name)
+
+        # Build Article schema
+        article_schema = {
+            "@context": "https://schema.org",
+            "@type": "Article",
+            "headline": article.get("title", "")[:110],  # Google truncates at 110 chars
+            "description": article.get("meta_description", article.get("excerpt", ""))[:160],
+            "author": {
+                "@type": "Person",
+                "name": author_name
+            },
+            "publisher": {
+                "@type": "Organization",
+                "name": company_name,
+                "url": base_url
+            },
+            "datePublished": current_date,
+            "dateModified": current_date,
+            "mainEntityOfPage": {
+                "@type": "WebPage",
+                "@id": f"{base_url}/blog/{article.get('slug', '')}"
+            },
+            "articleSection": article.get("category", "general"),
+            "keywords": ", ".join(article.get("tags", []))[:200],
+            "wordCount": article.get("word_count", 0),
+            "inLanguage": article.get("language", website.get("language", "en-US")),
+            "timeRequired": f"PT{article.get('read_time', 5)}M"
+        }
+
+        # Add audience if configured
+        audience_type = website.get("audience_type")
+        if audience_type:
+            article_schema["audience"] = {
+                "@type": "Audience",
+                "audienceType": audience_type
+            }
+
+        # Add speakable specification for voice search / AI assistants
+        article_schema["speakable"] = {
+            "@type": "SpeakableSpecification",
+            "cssSelector": [".tldr", "h1", "h2", ".faq-item", ".key-takeaways"]
+        }
+
+        # Add about entity for semantic understanding
+        primary_keyword = article.get("primary_keyword", "")
+        if primary_keyword:
+            article_schema["about"] = {
+                "@type": "Thing",
+                "name": primary_keyword,
+                "description": article.get("meta_description", "")[:200]
+            }
+
+        return {"article": article_schema}
+
+    def _generate_faq_schema(self, faq_items: list) -> dict:
+        """Generate FAQPage JSON-LD schema from FAQ items (enables FAQ rich snippets)."""
+        if not faq_items:
+            return {}
+
+        faq_schema = {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": []
+        }
+
+        for item in faq_items:
+            question = item.get("question", "")
+            answer = item.get("answer", "")
+
+            if question and answer:
+                faq_schema["mainEntity"].append({
+                    "@type": "Question",
+                    "name": question,
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": answer
+                    }
+                })
+
+        return faq_schema if faq_schema["mainEntity"] else {}
+
+    # =============================================
+    # INTERNAL LINK SUGGESTIONS
+    # =============================================
+
+    def _suggest_internal_links(self, article: dict, website: dict) -> list:
+        """Suggest internal links based on website configuration and content relevance."""
+        content_lower = article.get("content", "").lower()
+        category = article.get("category", "")
+        primary_keyword = article.get("primary_keyword", "").lower()
+
+        suggestions = []
+
+        # Get configured landing links from website (high-priority CTAs)
+        landing_links = website.get("landing_links", [])
+        for link in landing_links:
+            suggestions.append({
+                "url": link.get("url", ""),
+                "title": link.get("title", ""),
+                "anchor_text": link.get("anchor_text", link.get("title", "")),
+                "relevance": link.get("relevance", 8),  # Landing links get high priority
+                "category": "landing"
+            })
+
+        # Get related topic links from website config
+        related_topics = website.get("related_topics", {})
+        if category and category in related_topics:
+            for link in related_topics[category][:5]:
+                anchor = link.get("anchor", link.get("anchor_text", link.get("title", "")))
+                relevance = self._calculate_link_relevance(content_lower, anchor, primary_keyword)
+                if relevance > 0:
+                    suggestions.append({
+                        "url": link.get("url", ""),
+                        "title": link.get("title", ""),
+                        "anchor_text": anchor,
+                        "relevance": relevance,
+                        "category": category
+                    })
+
+        # Sort by relevance and limit to top 5
+        suggestions.sort(key=lambda x: x.get("relevance", 0), reverse=True)
+        return suggestions[:5]
+
+    def _calculate_link_relevance(self, content: str, anchor: str, primary_keyword: str = "") -> float:
+        """Calculate relevance score for an internal link based on content matching."""
+        if not anchor:
+            return 0
+
+        anchor_lower = anchor.lower()
+        relevance = 0
+
+        # Exact anchor match in content: highest score
+        if anchor_lower in content:
+            relevance += 5
+
+        # Check individual anchor words (longer than 3 chars)
+        anchor_words = [w for w in anchor_lower.split() if len(w) > 3]
+        word_matches = sum(1 for word in anchor_words if word in content)
+        relevance += word_matches * 0.5
+
+        # Bonus if anchor relates to primary keyword
+        if primary_keyword and primary_keyword in anchor_lower:
+            relevance += 2
+
+        return round(relevance, 2)
+
     def parse_article(self, content: str, topic: dict, website: dict) -> dict:
-        """Parse AI response into article structure."""
+        """Parse AI response into article structure with full GEO optimization.
+
+        This method now includes:
+        - Title optimization (uses topic.title, never AI-generated h1/h2)
+        - GEO element extraction (tldr, faq_items, statistics, citations)
+        - Schema generation (Article + FAQPage JSON-LD)
+        - Internal link suggestions
+        - Secondary keywords
+        """
+        import re
+
         # Generate slug from topic title
         slug = topic.get("title", "").lower()
         slug = "".join(c if c.isalnum() or c == " " else "" for c in slug)
         slug = "-".join(slug.split())[:60]
 
-        # Extract title before cleaning (may be in h1/h2)
-        title = topic.get("title")
-        if "<h1>" in content:
-            start = content.find("<h1>") + 4
-            end = content.find("</h1>")
-            if end > start:
-                title = content[start:end].strip()
-        elif "<h2>" in content:
-            start = content.find("<h2>") + 4
-            end = content.find("</h2>")
-            if end > start:
-                title = content[start:end].strip()
+        # ALWAYS use topic title - optimized, never extracted from AI content
+        # This fixes the "What Happened" bug where AI template headings became titles
+        title = self._optimize_title(topic.get("title", ""), topic, website)
 
         # Clean the content: remove code blocks, document structure, meta-commentary
         cleaned_content = self.clean_content(content, title)
 
         # Generate excerpt from cleaned content (strip HTML tags for text)
-        text_content = cleaned_content
-        for tag in ["<h1>", "</h1>", "<h2>", "</h2>", "<h3>", "</h3>", "<p>", "</p>",
-                    "<ul>", "</ul>", "<li>", "</li>", "<div>", "</div>",
-                    "<strong>", "</strong>", "<em>", "</em>", "<section>", "</section>"]:
-            text_content = text_content.replace(tag, " ")
-        # Also remove class attributes from remaining tags
-        import re
-        text_content = re.sub(r'<[^>]+>', ' ', text_content)
+        text_content = re.sub(r'<[^>]+>', ' ', cleaned_content)
         text_content = re.sub(r'\s+', ' ', text_content).strip()
         excerpt = text_content[:200] + "..." if len(text_content) > 200 else text_content
 
@@ -1553,7 +2003,20 @@ Writing rules:
         word_count = len(cleaned_content.split())
         read_time = max(1, word_count // 200)
 
-        return {
+        # Get language for GEO extraction
+        language = website.get("language", "en-US")
+
+        # Extract GEO elements from content
+        geo_elements = self._extract_geo_elements(cleaned_content, language)
+
+        # Get keywords from topic
+        keywords = topic.get("keywords", [])
+        primary_keyword = keywords[0] if keywords else ""
+        secondary_keywords = keywords[1:4] if len(keywords) > 1 else []
+
+        # Build article dict with ALL required fields
+        article = {
+            # Core fields
             "title": title,
             "slug": slug,
             "content": cleaned_content,
@@ -1562,11 +2025,32 @@ Writing rules:
             "word_count": word_count,
             "topic_id": topic.get("id"),
             "category": topic.get("category"),
-            "tags": topic.get("keywords", []),
-            "primary_keyword": topic.get("keywords", [""])[0] if topic.get("keywords") else "",
             "author": website.get("default_author", "Team"),
-            "language": website.get("language", "en-US"),
+            "language": language,
+
+            # SEO fields
+            "tags": keywords,
+            "primary_keyword": primary_keyword,
+            "secondary_keywords": secondary_keywords,
+
+            # GEO fields - extracted from content
+            "tldr": geo_elements.get("tldr"),
+            "faq_items": geo_elements.get("faq_items", []),
+            "cited_statistics": geo_elements.get("cited_statistics", []),
+            "citations": geo_elements.get("citations", []),
+            "geo_optimized": bool(geo_elements.get("tldr") or geo_elements.get("faq_items")),
         }
+
+        # Generate schema markup (Article JSON-LD)
+        article["schema_markup"] = self._generate_schema_markup(article, website)
+
+        # Generate FAQ schema (FAQPage JSON-LD) from extracted FAQ items
+        article["faq_schema"] = self._generate_faq_schema(geo_elements.get("faq_items", []))
+
+        # Suggest internal links based on content and website config
+        article["internal_links"] = self._suggest_internal_links(article, website)
+
+        return article
 
     def optimize_seo(self, article: dict, website: dict) -> dict:
         """Apply comprehensive SEO and GEO optimizations to the article.
@@ -1713,44 +2197,79 @@ Writing rules:
         score += keyword_score
 
         # === GEO FACTORS - AI SEARCH READINESS (25 points) ===
+        # Uses actual extracted GEO fields instead of pattern matching
         geo_score = 0
 
-        # FAQ section presence (critical for AI citations)
-        has_faq = bool(re.search(r'<h[23][^>]*>[^<]*(?:FAQ|Frequently Asked|Questions)[^<]*</h[23]>', content, re.IGNORECASE))
-        has_question_headings = len(re.findall(r'<h[23][^>]*>[^<]*\?</h[23]>', content)) >= 2
+        # TL;DR presence (8 points) - critical for AI search citations
+        tldr = article.get("tldr")
+        if tldr:
+            tldr_words = len(tldr.split())
+            if 40 <= tldr_words <= 80:
+                geo_score += 8  # Optimal length for AI extraction
+            elif 20 <= tldr_words <= 100:
+                geo_score += 5  # Acceptable length
+            else:
+                geo_score += 2  # Has TL;DR but suboptimal length
 
-        if has_faq:
-            geo_score += 8
-        elif has_question_headings:
+        # FAQ items (8 points) - enables FAQPage rich snippets
+        faq_items = article.get("faq_items", [])
+        if len(faq_items) >= 3:
+            geo_score += 8  # Optimal: 3+ FAQ items
+        elif len(faq_items) >= 2:
             geo_score += 5
-
-        # Summary/Key Takeaways section
-        has_summary = bool(re.search(r'<h[23][^>]*>[^<]*(?:Summary|Key Takeaways|Conclusion|TL;DR)[^<]*</h[23]>', content, re.IGNORECASE))
-        if has_summary:
-            geo_score += 5
-
-        # Structured bullet points (easy for AI to extract)
-        bullet_points = len(re.findall(r'<li[^>]*>', content))
-        if bullet_points >= 5:
-            geo_score += 5
-        elif bullet_points >= 3:
+        elif len(faq_items) >= 1:
             geo_score += 3
 
-        # Clear, quotable statements (sentences ending with period after specific words)
-        # Look for definitional patterns: "X is", "X means", "X refers to"
-        definitional_patterns = len(re.findall(r'(?:is|means|refers to|defined as)[^.]{20,100}\.', content))
-        if definitional_patterns >= 2:
+        # Cited statistics (5 points) - AI engines trust cited data
+        cited_statistics = article.get("cited_statistics", [])
+        if len(cited_statistics) >= 3:
+            geo_score += 5
+        elif len(cited_statistics) >= 1:
+            geo_score += 3
+
+        # Expert citations (4 points) - increases authority
+        citations = article.get("citations", [])
+        if len(citations) >= 2:
             geo_score += 4
-        elif definitional_patterns >= 1:
+        elif len(citations) >= 1:
             geo_score += 2
 
-        # Has numbers/statistics (AI loves citing specific data)
-        has_numbers = bool(re.search(r'\d+(?:\.\d+)?(?:%|percent|times|x|hours|days|years)', content, re.IGNORECASE))
-        if has_numbers:
-            geo_score += 3
+        # Fallback: Check content patterns if no extracted GEO elements
+        if geo_score < 10:
+            # Check for FAQ section in content
+            has_faq_section = bool(re.search(r'<h[23][^>]*>[^<]*(?:FAQ|Frequently Asked|Questions|Veelgestelde vragen)[^<]*</h[23]>', content, re.IGNORECASE))
+            has_question_headings = len(re.findall(r'<h[23][^>]*>[^<]*\?</h[23]>', content)) >= 2
+            if has_faq_section or has_question_headings:
+                geo_score += 3
+
+            # Check for summary section
+            has_summary = bool(re.search(r'<h[23][^>]*>[^<]*(?:Summary|Key Takeaways|Conclusion|TL;DR|Samenvatting)[^<]*</h[23]>', content, re.IGNORECASE))
+            if has_summary:
+                geo_score += 2
 
         scoring_breakdown["geo"] = geo_score
         score += geo_score
+
+        # Generate keyword analysis
+        article["keyword_analysis"] = {
+            "word_count": word_count,
+            "primary_keyword": {
+                "keyword": primary_keyword,
+                "density": round(keyword_density, 2) if 'keyword_density' in dir() else 0,
+                "title_present": primary_keyword.lower() in title.lower() if primary_keyword else False,
+                "content_count": content.lower().count(primary_keyword.lower()) if primary_keyword else 0
+            },
+            "secondary_keywords": [
+                {
+                    "keyword": kw,
+                    "count": content.lower().count(kw.lower()),
+                    "density": round((content.lower().count(kw.lower()) / word_count * 100), 2) if word_count > 0 else 0,
+                    "title_present": kw.lower() in title.lower()
+                }
+                for kw in article.get("secondary_keywords", [])
+            ],
+            "recommendations": []
+        }
 
         # Set article properties
         article["meta_description"] = meta_desc
@@ -1780,18 +2299,34 @@ Writing rules:
 
         # Optional fields - will be removed if target schema doesn't have them
         optional_fields = {
+            # Basic SEO fields
             "excerpt": article.get("excerpt"),
             "meta_description": article.get("meta_description"),
             "tags": article.get("tags", []),
             "primary_keyword": article.get("primary_keyword"),
+            "secondary_keywords": article.get("secondary_keywords", []),
             "author": article.get("author"),
             "read_time": article.get("read_time"),
             "category": article.get("category"),
             "seo_score": article.get("seo_score"),
+            "keyword_analysis": article.get("keyword_analysis"),
+
+            # Product/website identification
             "product_id": website.get("product_id"),
             "website_domain": website.get("domain"),
             "language": article.get("language"),
+
+            # GEO fields (Generative Engine Optimization)
             "geo_optimized": article.get("geo_optimized", False),
+            "tldr": article.get("tldr"),
+            "faq_items": article.get("faq_items", []),
+            "faq_schema": article.get("faq_schema", {}),
+            "cited_statistics": article.get("cited_statistics", []),
+            "citations": article.get("citations", []),
+
+            # Schema and internal links
+            "internal_links": article.get("internal_links", []),
+            "schema_markup": article.get("schema_markup", {}),
         }
 
         # Start with all fields
