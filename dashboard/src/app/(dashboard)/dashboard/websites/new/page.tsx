@@ -330,6 +330,32 @@ export default function NewWebsitePage() {
         .replace(/\/$/, "")
         .toLowerCase();
 
+      // Build seo_config with preview scan data (if available)
+      // This allows the onboarding to skip the scan step if preview already completed
+      const seoConfig: Record<string, unknown> = {
+        fallback_meta_template: "{title} - {domain}",
+        default_category: "general",
+        schema_organization: {},
+      };
+
+      // Include preview scan data so onboarding can progress immediately
+      if (previewScanData) {
+        if (previewScanData.niche_description) {
+          seoConfig.niche_description = previewScanData.niche_description;
+        }
+        if (previewScanData.content_themes?.length) {
+          seoConfig.content_themes = previewScanData.content_themes;
+        }
+        if (previewScanData.main_keywords?.length) {
+          seoConfig.main_keywords = previewScanData.main_keywords;
+        }
+        if (previewScanData.homepage_title) {
+          seoConfig.homepage_title = previewScanData.homepage_title;
+        }
+        // Mark scan as already complete from preview
+        seoConfig.onboarding_status = "scanning"; // Will be detected as complete on first poll
+      }
+
       // Create website
       const { data: website, error: websiteError } = await supabase
         .from("websites")
@@ -343,6 +369,7 @@ export default function NewWebsitePage() {
           days_between_posts: formData.days_between_posts,
           is_active: true,
           next_scheduled_at: new Date().toISOString(),
+          seo_config: seoConfig,
         })
         .select()
         .single();
