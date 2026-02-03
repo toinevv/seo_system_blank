@@ -105,7 +105,7 @@ export async function POST(
       .eq("id", id);
 
     // Trigger scan asynchronously (don't await - let GET endpoint poll for completion)
-    const workerUrl = process.env.WORKER_URL;
+    const workerUrl = process.env.WORKER_URL || "https://seo-content-generator.ta-voeten.workers.dev";
     if (workerUrl) {
       // Fire and forget - scan runs in background
       fetch(`${workerUrl}/scan?website_id=${id}`, {

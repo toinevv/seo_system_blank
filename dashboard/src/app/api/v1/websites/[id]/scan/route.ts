@@ -103,16 +103,7 @@ export async function POST(
     }
 
     // Get the worker URL from environment
-    const workerUrl = process.env.WORKER_URL;
-
-    if (!workerUrl) {
-      return apiError(
-        "WORKER_NOT_CONFIGURED",
-        "Worker URL not configured",
-        "Contact support to configure the worker",
-        503
-      );
-    }
+    const workerUrl = process.env.WORKER_URL || "https://seo-content-generator.ta-voeten.workers.dev";
 
     // Call the worker's scan endpoint
     try {

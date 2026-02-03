@@ -186,25 +186,7 @@ export async function POST(
     }
 
     // Call the worker to generate
-    const workerUrl = process.env.WORKER_URL;
-
-    if (!workerUrl) {
-      // Update log to failed
-      await supabase
-        .from("generation_logs")
-        .update({
-          status: "failed",
-          error_message: "Worker URL not configured",
-        })
-        .eq("id", logEntry.id);
-
-      return apiError(
-        "WORKER_NOT_CONFIGURED",
-        "Worker URL not configured",
-        "Contact support to configure the worker",
-        503
-      );
-    }
+    const workerUrl = process.env.WORKER_URL || "https://seo-content-generator.ta-voeten.workers.dev";
 
     try {
       // Trigger generation (async - worker will update status)

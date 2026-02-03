@@ -172,16 +172,7 @@ export async function POST(
 
     // Option 2: Trigger topic discovery via worker
     if (discover) {
-      const workerUrl = process.env.WORKER_URL;
-
-      if (!workerUrl) {
-        return apiError(
-          "WORKER_NOT_CONFIGURED",
-          "Worker URL not configured",
-          "Contact support to configure the worker",
-          503
-        );
-      }
+      const workerUrl = process.env.WORKER_URL || "https://seo-content-generator.ta-voeten.workers.dev";
 
       try {
         const discoverResponse = await fetch(`${workerUrl}/discover-topics`, {
