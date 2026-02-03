@@ -632,6 +632,18 @@ GRANT ALL ON public.blog_articles TO service_role;`;
     setTimeout(() => setSqlCopied(false), 2000);
   };
 
+  // Show loading while checking subscription status
+  if (checkingSubscription) {
+    return (
+      <div className="flex flex-col">
+        <Header title="Add New Website" description="Connect a new website to your SEO dashboard" />
+        <div className="p-6 max-w-3xl mx-auto w-full flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col">
       <Header title="Add New Website" description="Connect a new website to your SEO dashboard" />
