@@ -170,15 +170,14 @@ export default function NewWebsitePage() {
           return;
         }
 
-        // Check for active subscription in subscriptions table
-        const { data: subscription } = await supabase
-          .from("subscriptions")
-          .select("status")
-          .eq("user_id", user.id)
-          .eq("status", "active")
+        // Check for active subscription in profiles table (set by Stripe webhook)
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("subscription_status")
+          .eq("id", user.id)
           .single();
 
-        if (subscription) {
+        if (profile?.subscription_status === "active") {
           setHasActiveSubscription(true);
         }
       } catch (err) {
@@ -386,10 +385,10 @@ export default function NewWebsitePage() {
       case "basic":
         return formData.name && formData.domain && formData.product_id;
       case "database":
-        // Vibe method: just needs to select the method
-        // SQL method: needs credentials
-        if (setupMethod === "vibe") return true;
-        if (setupMethod === "sql") return formData.target_supabase_url && formData.target_supabase_service_key;
+        // Both methods need credentials (we need them to publish articles)
+        const hasCredentials = formData.target_supabase_url && formData.target_supabase_service_key;
+        if (setupMethod === "vibe") return hasCredentials;
+        if (setupMethod === "sql") return hasCredentials;
         return false; // Must select a method
       case "review":
         return true; // Always allow proceeding to checkout
@@ -736,36 +735,102 @@ GRANT ALL ON public.blog_articles TO service_role;`;
 
                 {/* Vibe Integration Content */}
                 {setupMethod === "vibe" && (
-                  <div className="space-y-3 pt-2">
-                    <p className="text-sm text-muted-foreground">
-                      Copy this prompt and paste it into your AI coding tool:
-                    </p>
-                    <div className="relative">
-                      <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-48 overflow-y-auto">
-                        <code>{VIBE_PROMPT}</code>
-                      </pre>
+                  <div className="space-y-4 pt-2">
+                    {/* Step 1: Copy prompt for AI tool */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-medium">1</span>
+                        <p className="text-sm font-medium">Copy prompt for your AI tool</p>
+                      </div>
+                      <div className="relative ml-8">
+                        <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-40 overflow-y-auto">
+                          <code>{VIBE_PROMPT}</code>
+                        </pre>
+                      </div>
+                      <div className="ml-8">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(VIBE_PROMPT);
+                            setPromptCopied(true);
+                            setTimeout(() => setPromptCopied(false), 2000);
+                          }}
+                        >
+                          {promptCopied ? (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy Prompt
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(VIBE_PROMPT);
-                        setPromptCopied(true);
-                        setTimeout(() => setPromptCopied(false), 2000);
-                      }}
-                      className="w-full"
-                    >
-                      {promptCopied ? (
-                        <>
-                          <Check className="h-4 w-4 mr-2" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy Prompt
-                        </>
-                      )}
-                    </Button>
+
+                    {/* Step 2: Enter credentials */}
+                    <div className="space-y-3 border-t pt-4">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-medium">2</span>
+                        <p className="text-sm font-medium">Enter your Supabase credentials</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground ml-8">
+                        We need these to publish articles to your database
+                      </p>
+                      <div className="ml-8 space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="vibe_supabase_url">Supabase URL</Label>
+                          <Input
+                            id="vibe_supabase_url"
+                            placeholder="https://xxxxx.supabase.co"
+                            value={formData.target_supabase_url}
+                            onChange={(e) => {
+                              updateField("target_supabase_url", e.target.value);
+                              setConnectionStatus("idle");
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="vibe_supabase_service_key">Service Role Key</Label>
+                          <Input
+                            id="vibe_supabase_service_key"
+                            type="password"
+                            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                            value={formData.target_supabase_service_key}
+                            onChange={(e) => {
+                              updateField("target_supabase_service_key", e.target.value);
+                              setConnectionStatus("idle");
+                            }}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Supabase Dashboard → Settings → API → service_role
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={testConnection}
+                          disabled={!formData.target_supabase_url || !formData.target_supabase_service_key || testingConnection}
+                        >
+                          {testingConnection ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : connectionStatus === "success" ? (
+                            <Check className="h-4 w-4 text-green-600 mr-2" />
+                          ) : null}
+                          {connectionStatus === "success" ? "Connected" : "Test Connection"}
+                        </Button>
+                        {connectionError && (
+                          <p className={`text-sm ${connectionStatus === "success" ? "text-green-600" : "text-destructive"}`}>
+                            {connectionError}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
