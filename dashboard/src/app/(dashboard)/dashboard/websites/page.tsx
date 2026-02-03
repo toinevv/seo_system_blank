@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WebsiteCard } from "@/components/dashboard/website-card";
 import Link from "next/link";
-import { Plus, Globe, AlertTriangle } from "lucide-react";
-import { canAddWebsite } from "@/lib/plan-limits";
+import { Plus, Globe } from "lucide-react";
+import { canAddWebsite, getPlanLimits } from "@/lib/plan-limits";
+import { getActiveSubscription } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +18,11 @@ export default async function WebsitesPage() {
   // Get current user
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Get user's subscription info
+  // Get user's profile (including stripe customer ID for fallback)
   const { data: profile } = user
     ? await adminClient
         .from("profiles")
-        .select("subscription_plan, subscription_status")
+        .select("subscription_plan, subscription_status, stripe_customer_id")
         .eq("id", user.id)
         .single()
     : { data: null };
@@ -35,9 +36,31 @@ export default async function WebsitesPage() {
     `)
     .order("created_at", { ascending: false });
 
-  // Check if user can add more websites
-  const activePlan = profile?.subscription_status === "active" ? profile.subscription_plan : null;
-  const websiteCheck = canAddWebsite(activePlan, websites?.length || 0);
+  // Determine user's active plan
+  // First try from profile (cached), then fallback to Stripe API
+  let activePlan: string | null = null;
+
+  if (profile?.subscription_status === "active" && profile.subscription_plan) {
+    // Use cached subscription from profile
+    activePlan = profile.subscription_plan;
+  } else if (profile?.stripe_customer_id) {
+    // Fallback: fetch from Stripe directly
+    try {
+      const stripeSubscription = await getActiveSubscription(profile.stripe_customer_id);
+      if (stripeSubscription?.plan) {
+        // Extract base plan name (e.g., "starter" from "Starter + GEO")
+        const planName = stripeSubscription.plan.name.toLowerCase().split(" ")[0];
+        if (getPlanLimits(planName)) {
+          activePlan = planName;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch Stripe subscription:", e);
+    }
+  }
+
+  const websiteCount = websites?.length || 0;
+  const websiteCheck = canAddWebsite(activePlan, websiteCount);
 
   return (
     <div className="flex flex-col">
@@ -47,14 +70,17 @@ export default async function WebsitesPage() {
       />
 
       <div className="p-6 space-y-6">
-        {/* Add Website Button */}
+        {/* Header with count and add button */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <p className="text-muted-foreground">
-              {websites?.length || 0} / {websiteCheck.limit || "?"} website(s)
+              {websiteCount} / {websiteCheck.limit || (activePlan ? "?" : "∞")} website(s)
             </p>
             {activePlan && (
               <Badge variant="outline" className="capitalize">{activePlan} plan</Badge>
+            )}
+            {!activePlan && websiteCount > 0 && (
+              <Badge variant="secondary">No subscription</Badge>
             )}
           </div>
           {websiteCheck.allowed ? (
@@ -64,6 +90,15 @@ export default async function WebsitesPage() {
                 Add Website
               </Button>
             </Link>
+          ) : websiteCheck.noSubscription ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">{websiteCheck.reason}</span>
+              <Link href="/dashboard/websites/new">
+                <Button>
+                  Subscribe & Add Website
+                </Button>
+              </Link>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">{websiteCheck.reason}</span>
@@ -92,13 +127,15 @@ export default async function WebsitesPage() {
               <div>
                 <h3 className="text-lg font-semibold">No websites yet</h3>
                 <p className="text-muted-foreground">
-                  Add your first website to start generating SEO content.
+                  {activePlan
+                    ? "Add your first website to start generating SEO content."
+                    : "Subscribe to a plan and add your first website."}
                 </p>
               </div>
               <Link href="/dashboard/websites/new">
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Your First Website
+                  {activePlan ? "Add Your First Website" : "Get Started"}
                 </Button>
               </Link>
             </div>

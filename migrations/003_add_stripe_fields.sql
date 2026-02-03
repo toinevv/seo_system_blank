@@ -51,7 +51,7 @@ BEGIN
     RETURN QUERY
     SELECT
         CASE plan_name
-            WHEN 'starter' THEN 1
+            WHEN 'starter' THEN 2
             WHEN 'pro' THEN 3
             WHEN 'business' THEN 10
             ELSE 0

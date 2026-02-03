@@ -2,7 +2,7 @@
 
 export const PLAN_LIMITS = {
   starter: {
-    maxWebsites: 1,
+    maxWebsites: 2,
     articlesPerMonth: 3,
   },
   pro: {
@@ -27,20 +27,22 @@ export function getPlanLimits(plan: string | null): { maxWebsites: number; artic
 export function canAddWebsite(
   currentPlan: string | null,
   currentWebsiteCount: number
-): { allowed: boolean; reason?: string; limit?: number } {
+): { allowed: boolean; reason?: string; limit?: number; noSubscription?: boolean; atLimit?: boolean } {
   const limits = getPlanLimits(currentPlan);
 
   if (!limits) {
     return {
       allowed: false,
-      reason: "You need an active subscription to add websites.",
+      noSubscription: true,
+      reason: "Subscribe to add websites.",
     };
   }
 
   if (currentWebsiteCount >= limits.maxWebsites) {
     return {
       allowed: false,
-      reason: `Your ${currentPlan} plan allows up to ${limits.maxWebsites} website${limits.maxWebsites > 1 ? "s" : ""}. Upgrade to add more.`,
+      atLimit: true,
+      reason: `Your ${currentPlan} plan allows ${limits.maxWebsites} website${limits.maxWebsites > 1 ? "s" : ""}. Upgrade to add more.`,
       limit: limits.maxWebsites,
     };
   }
