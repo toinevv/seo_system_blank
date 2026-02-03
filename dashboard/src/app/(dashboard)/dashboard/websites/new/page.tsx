@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ArrowRight, Check, Loader2, Copy, ExternalLink, CreditCard, Sparkles, X, AlertTriangle, TrendingUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Copy, ExternalLink, CreditCard, Sparkles, X, AlertTriangle, TrendingUp, Bot, Database } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -45,6 +45,40 @@ const PLAN_DETAILS: Record<string, { name: string; price: number; geoPrice: numb
   business: { name: "Business", price: 150, geoPrice: 290, articles: 30 },
 };
 
+// Vibe coder prompt (same as landing page)
+const VIBE_PROMPT = `Add IndexYourNiche SEO blog to this project.
+
+## Step 1: Create Articles Table
+Run this SQL in Supabase SQL Editor:
+
+CREATE TABLE IF NOT EXISTS public.blog_articles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  excerpt TEXT,
+  meta_description TEXT,
+  cover_image_url TEXT,
+  tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+  published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  status TEXT DEFAULT 'published',
+  author TEXT,
+  tldr TEXT,
+  faq_items JSONB DEFAULT '[]'::JSONB,
+  CONSTRAINT blog_articles_slug_product_unique UNIQUE(slug, product_id)
+);
+
+ALTER TABLE public.blog_articles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public can read published" ON public.blog_articles FOR SELECT USING (status = 'published');
+GRANT SELECT ON public.blog_articles TO anon;
+
+## Step 2: Build Blog Frontend
+Create app/blog/page.tsx (list articles) and app/blog/[slug]/page.tsx (single article).
+Fetch from Supabase, add SEO meta tags and JSON-LD schema.
+
+Done! Articles will appear in your database automatically.`;
+
 export default function NewWebsitePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -62,6 +96,8 @@ export default function NewWebsitePage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sqlCopied, setSqlCopied] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
+  const [setupMethod, setSetupMethod] = useState<"vibe" | "sql" | null>(null);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -350,7 +386,11 @@ export default function NewWebsitePage() {
       case "basic":
         return formData.name && formData.domain && formData.product_id;
       case "database":
-        return formData.target_supabase_url && formData.target_supabase_service_key;
+        // Vibe method: just needs to select the method
+        // SQL method: needs credentials
+        if (setupMethod === "vibe") return true;
+        if (setupMethod === "sql") return formData.target_supabase_url && formData.target_supabase_service_key;
+        return false; // Must select a method
       case "review":
         return true; // Always allow proceeding to checkout
       case "checkout":
@@ -659,147 +699,160 @@ GRANT ALL ON public.blog_articles TO service_role;`;
             )}
 
             {step === "database" && (
-              <>
-                {/* Background Scan Status */}
-                {previewScanStatus === "scanning" && (
-                  <div className="rounded-md bg-blue-50 border border-blue-200 p-3 mb-4 flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                    <p className="text-sm text-blue-800">
-                      Analyzing <strong>{formData.domain}</strong> in the background...
-                    </p>
-                  </div>
-                )}
-                {previewScanStatus === "done" && previewScanData && (
-                  <div className="rounded-md bg-green-50 border border-green-200 p-3 mb-4">
-                    <p className="text-sm text-green-800 flex items-center gap-2">
-                      <Check className="h-4 w-4" />
-                      Website analyzed: <strong>{previewScanData.niche_description ? previewScanData.niche_description.slice(0, 60) + "..." : formData.domain}</strong>
-                    </p>
-                  </div>
-                )}
-
-                {/* Credentials Section */}
-                <div className="rounded-md bg-muted p-4 mb-4">
-                  <p className="text-sm">
-                    Enter the Supabase credentials for the <strong>target website</strong> where
-                    articles will be published. This is the website&apos;s own database, not the
-                    central dashboard database.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="target_supabase_url">Target Supabase URL</Label>
-                  <Input
-                    id="target_supabase_url"
-                    placeholder="https://xxxxx.supabase.co"
-                    value={formData.target_supabase_url}
-                    onChange={(e) => {
-                      updateField("target_supabase_url", e.target.value);
-                      setConnectionStatus("idle");
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="target_supabase_service_key">Target Service Role Key</Label>
-                  <Input
-                    id="target_supabase_service_key"
-                    type="password"
-                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    value={formData.target_supabase_service_key}
-                    onChange={(e) => {
-                      updateField("target_supabase_service_key", e.target.value);
-                      setConnectionStatus("idle");
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Find this in Supabase Dashboard → Settings → API → service_role key
-                  </p>
-                </div>
-
-                {/* Test Connection Button */}
-                <div className="pt-2">
-                  <Button
+              <div className="space-y-4">
+                {/* Setup Method Selection */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
                     type="button"
-                    variant="outline"
-                    onClick={testConnection}
-                    disabled={!formData.target_supabase_url || !formData.target_supabase_service_key || testingConnection}
-                    className="flex items-center gap-2"
+                    onClick={() => setSetupMethod(setupMethod === "vibe" ? null : "vibe")}
+                    className={`flex items-center gap-3 p-4 rounded-lg border-2 text-left transition-all ${
+                      setupMethod === "vibe"
+                        ? "border-primary bg-primary/5"
+                        : "border-muted hover:border-primary/50"
+                    }`}
                   >
-                    {testingConnection ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Testing...
-                      </>
-                    ) : connectionStatus === "success" ? (
-                      <>
-                        <Check className="h-4 w-4 text-green-600" />
-                        Connection OK
-                      </>
-                    ) : (
-                      "Test Connection"
-                    )}
-                  </Button>
-                  {connectionError && (
-                    <p className={`text-sm mt-2 ${connectionStatus === "success" ? "text-green-600" : "text-destructive"}`}>
-                      {connectionError}
-                    </p>
-                  )}
+                    <Bot className={`h-5 w-5 ${setupMethod === "vibe" ? "text-primary" : "text-muted-foreground"}`} />
+                    <div>
+                      <p className="font-medium text-sm">AI Setup</p>
+                      <p className="text-xs text-muted-foreground">Lovable, Cursor, etc.</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSetupMethod(setupMethod === "sql" ? null : "sql")}
+                    className={`flex items-center gap-3 p-4 rounded-lg border-2 text-left transition-all ${
+                      setupMethod === "sql"
+                        ? "border-primary bg-primary/5"
+                        : "border-muted hover:border-primary/50"
+                    }`}
+                  >
+                    <Database className={`h-5 w-5 ${setupMethod === "sql" ? "text-primary" : "text-muted-foreground"}`} />
+                    <div>
+                      <p className="font-medium text-sm">Manual Setup</p>
+                      <p className="text-xs text-muted-foreground">SQL + credentials</p>
+                    </div>
+                  </button>
                 </div>
 
-                {/* SQL Setup Section - only show after credentials are entered */}
-                {formData.target_supabase_url && formData.target_supabase_service_key && (
-                  <div className="border-t pt-6 mt-6">
-                    <div className="rounded-md bg-blue-50 border border-blue-200 p-4 mb-4">
-                      <p className="text-sm text-blue-800">
-                        <strong>📋 One-time setup:</strong> Copy the SQL below and run it in your Supabase SQL Editor
-                        to create the <code className="bg-blue-100 px-1 rounded">blog_articles</code> table.
+                {/* Vibe Integration Content */}
+                {setupMethod === "vibe" && (
+                  <div className="space-y-3 pt-2">
+                    <p className="text-sm text-muted-foreground">
+                      Copy this prompt and paste it into your AI coding tool:
+                    </p>
+                    <div className="relative">
+                      <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-48 overflow-y-auto">
+                        <code>{VIBE_PROMPT}</code>
+                      </pre>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(VIBE_PROMPT);
+                        setPromptCopied(true);
+                        setTimeout(() => setPromptCopied(false), 2000);
+                      }}
+                      className="w-full"
+                    >
+                      {promptCopied ? (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy Prompt
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {/* SQL Integration Content */}
+                {setupMethod === "sql" && (
+                  <div className="space-y-4 pt-2">
+                    {/* Credentials */}
+                    <div className="space-y-2">
+                      <Label htmlFor="target_supabase_url">Supabase URL</Label>
+                      <Input
+                        id="target_supabase_url"
+                        placeholder="https://xxxxx.supabase.co"
+                        value={formData.target_supabase_url}
+                        onChange={(e) => {
+                          updateField("target_supabase_url", e.target.value);
+                          setConnectionStatus("idle");
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="target_supabase_service_key">Service Role Key</Label>
+                      <Input
+                        id="target_supabase_service_key"
+                        type="password"
+                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        value={formData.target_supabase_service_key}
+                        onChange={(e) => {
+                          updateField("target_supabase_service_key", e.target.value);
+                          setConnectionStatus("idle");
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Supabase Dashboard → Settings → API → service_role
                       </p>
                     </div>
 
-                    <div className="flex gap-2 mb-3">
+                    {/* Test + SQL buttons */}
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={testConnection}
+                        disabled={!formData.target_supabase_url || !formData.target_supabase_service_key || testingConnection}
+                      >
+                        {testingConnection ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : connectionStatus === "success" ? (
+                          <Check className="h-4 w-4 text-green-600" />
+                        ) : (
+                          "Test"
+                        )}
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
                         onClick={copyToClipboard}
-                        className="flex items-center gap-2"
                       >
-                        {sqlCopied ? (
-                          <>
-                            <Check className="h-4 w-4 text-green-600" />
-                            Copied!
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-4 w-4" />
-                            Copy SQL
-                          </>
-                        )}
+                        {sqlCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        <span className="ml-2">{sqlCopied ? "Copied!" : "Copy SQL"}</span>
                       </Button>
-
                       {sqlEditorUrl && (
                         <a href={sqlEditorUrl} target="_blank" rel="noopener noreferrer">
-                          <Button type="button" variant="default" className="flex items-center gap-2">
-                            <ExternalLink className="h-4 w-4" />
-                            Open SQL Editor
+                          <Button type="button" variant="default">
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            SQL Editor
                           </Button>
                         </a>
                       )}
                     </div>
+                    {connectionError && (
+                      <p className={`text-sm ${connectionStatus === "success" ? "text-green-600" : "text-destructive"}`}>
+                        {connectionError}
+                      </p>
+                    )}
 
-                    <div className="relative">
-                      <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-64 overflow-y-auto">
+                    {/* Collapsible SQL Preview */}
+                    <details className="group">
+                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                        View SQL schema
+                      </summary>
+                      <pre className="mt-2 bg-slate-900 text-slate-100 p-3 rounded-lg overflow-x-auto text-xs max-h-48 overflow-y-auto">
                         <code>{databaseSql}</code>
                       </pre>
-                    </div>
-
-                    <div className="rounded-md bg-amber-50 border border-amber-200 p-4 mt-4">
-                      <p className="text-sm text-amber-800">
-                        <strong>💡 Tip:</strong> Click &quot;Open SQL Editor&quot;, paste the SQL, and click &quot;Run&quot;.
-                        Then use &quot;Test Connection&quot; above to verify it worked.
-                      </p>
-                    </div>
+                    </details>
                   </div>
                 )}
-              </>
+              </div>
             )}
 
             {step === "checkout" && (
