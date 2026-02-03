@@ -144,7 +144,7 @@ export async function GET(
     }
 
     const supabase = createAdminClient();
-    const workerUrl = process.env.WORKER_URL;
+    const workerUrl = process.env.WORKER_URL || "https://seo-content-generator.ta-voeten.workers.dev";
 
     // Get website with current state
     const { data: website, error: websiteError } = await supabase
