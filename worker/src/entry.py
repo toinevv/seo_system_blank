@@ -2188,32 +2188,44 @@ Writing rules:
             # Get platform OpenAI key
             openai_key = getattr(self.env, "PLATFORM_OPENAI_KEY", None)
 
-            # Fetch homepage
+            # Fetch homepage (with 10s timeout)
             homepage_url = f"https://{domain}"
-            homepage_html = await self.fetch_page_content(homepage_url)
+            console.log(f"[1/4] Fetching homepage: {homepage_url}")
+            homepage_html = await self.fetch_page_content(homepage_url, timeout_ms=10000)
+
+            if not homepage_html:
+                # Try www variant
+                console.log(f"Homepage failed, trying www.{domain}")
+                homepage_url = f"https://www.{domain}"
+                homepage_html = await self.fetch_page_content(homepage_url, timeout_ms=10000)
 
             if not homepage_html:
                 return {
                     "success": False,
                     "domain": domain,
-                    "error": f"Failed to fetch homepage: {homepage_url}"
+                    "error": f"Failed to fetch homepage (tried with and without www)"
                 }
 
+            console.log(f"[2/4] Extracting metadata from homepage")
             # Extract metadata from homepage
             homepage_data = self.extract_page_metadata(homepage_html, homepage_url)
 
-            # Find navigation links to scan more pages (limit to 3 for preview)
+            # Find navigation links and scan all header pages (up to 6 for good context)
             nav_links = self.identify_navigation_links(homepage_html, domain)
             pages_data = [homepage_data]
 
-            for link in nav_links[:3]:
+            max_pages = min(len(nav_links), 6)
+            console.log(f"[3/4] Scanning {max_pages} navigation pages")
+            for i, link in enumerate(nav_links[:6]):
                 try:
-                    page_html = await self.fetch_page_content(link["url"])
+                    # Shorter timeout per page to keep total time reasonable
+                    page_html = await self.fetch_page_content(link["url"], timeout_ms=6000)
                     if page_html:
                         page_data = self.extract_page_metadata(page_html, link["url"])
                         pages_data.append(page_data)
+                        console.log(f"  ✓ {link['text']}: {link['url']}")
                 except:
-                    pass
+                    console.log(f"  ✗ Failed: {link['url']}")
 
             # Compile extracted data
             all_keywords = []
@@ -2235,12 +2247,16 @@ Writing rules:
             content_themes = []
 
             if openai_key and (all_keywords or all_headings or all_titles):
+                console.log(f"[4/4] Analyzing content with AI...")
                 ai_analysis = await self.analyze_content_with_ai_preview(
                     domain, all_titles, all_headings, all_keywords, openai_key
                 )
                 if ai_analysis:
                     niche_description = ai_analysis.get("niche_description")
                     content_themes = ai_analysis.get("content_themes", [])
+                    console.log(f"  - Niche identified: {niche_description[:50]}..." if niche_description else "  - No niche identified")
+            else:
+                console.log(f"[4/4] Skipping AI analysis (no API key or no content)")
 
             return {
                 "success": True,
@@ -2542,8 +2558,15 @@ Return ONLY valid JSON:
             )
             return False
 
-    async def fetch_page_content(self, url: str) -> Optional[str]:
-        """Fetch HTML content from a URL."""
+    async def fetch_page_content(self, url: str, timeout_ms: int = 10000) -> Optional[str]:
+        """Fetch HTML content from a URL with timeout.
+
+        Args:
+            url: The URL to fetch
+            timeout_ms: Timeout in milliseconds (default 10 seconds)
+        """
+        from js import AbortController, setTimeout
+
         try:
             headers = {
                 "User-Agent": "Mozilla/5.0 (compatible; SEOBot/1.0; +https://example.com/bot)",
@@ -2551,7 +2574,21 @@ Return ONLY valid JSON:
                 "Accept-Language": "en-US,en;q=0.9,nl;q=0.8"
             }
 
-            response = await fetch(url, self._make_options("GET", headers))
+            # Create AbortController for timeout
+            controller = AbortController.new()
+            timeout_id = setTimeout(lambda: controller.abort(), timeout_ms)
+
+            options = {
+                "method": "GET",
+                "headers": headers,
+                "signal": controller.signal
+            }
+
+            response = await fetch(url, to_js(options, dict_converter=Object.fromEntries))
+
+            # Clear timeout if request completed
+            from js import clearTimeout
+            clearTimeout(timeout_id)
 
             if response.ok:
                 text = await response.text()
@@ -2563,7 +2600,11 @@ Return ONLY valid JSON:
                 console.log(f"Failed to fetch {url}: {response.status}")
                 return None
         except Exception as e:
-            console.log(f"Fetch error for {url}: {str(e)}")
+            error_msg = str(e)
+            if "abort" in error_msg.lower():
+                console.log(f"Timeout fetching {url} after {timeout_ms}ms")
+            else:
+                console.log(f"Fetch error for {url}: {error_msg}")
             return None
 
     def extract_page_metadata(self, html: str, url: str) -> dict:
