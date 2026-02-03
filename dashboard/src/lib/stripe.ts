@@ -9,8 +9,7 @@ export function getStripe(): Stripe {
       throw new Error("STRIPE_SECRET_KEY is not configured");
     }
     _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      // Use a stable API version (check https://stripe.com/docs/api/versioning)
-      apiVersion: "2024-12-18.acacia",
+      apiVersion: "2025-02-24.acacia",
       typescript: true,
       // Use fetch for Cloudflare Workers compatibility
       httpClient: Stripe.createFetchHttpClient(),

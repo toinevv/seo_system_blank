@@ -26,29 +26,35 @@ export async function GET() {
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id);
 
+    // Get user's website IDs first
+    const { data: websites } = await adminClient
+      .from("websites")
+      .select("id")
+      .eq("user_id", user.id);
+
+    const websiteIds = websites?.map(w => w.id) || [];
+
     // Count articles generated this month
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const { count: articlesThisMonth } = await adminClient
-      .from("generation_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "success")
-      .gte("created_at", startOfMonth.toISOString())
-      .in(
-        "website_id",
-        adminClient
-          .from("websites")
-          .select("id")
-          .eq("user_id", user.id)
-      );
+    let articlesThisMonth = 0;
+    if (websiteIds.length > 0) {
+      const { count } = await adminClient
+        .from("generation_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "success")
+        .gte("created_at", startOfMonth.toISOString())
+        .in("website_id", websiteIds);
+      articlesThisMonth = count || 0;
+    }
 
     // Get plan and check limits
     const plan = profile?.subscription_status === "active" ? profile.subscription_plan : null;
     const limits = getPlanLimits(plan);
     const websiteCheck = canAddWebsite(plan, websiteCount || 0);
-    const articleCheck = canGenerateArticle(plan, articlesThisMonth || 0);
+    const articleCheck = canGenerateArticle(plan, articlesThisMonth);
 
     return NextResponse.json({
       plan: plan,
@@ -62,7 +68,7 @@ export async function GET() {
           message: websiteCheck.reason,
         },
         articles: {
-          current: articlesThisMonth || 0,
+          current: articlesThisMonth,
           limit: limits?.articlesPerMonth || 0,
           remaining: articleCheck.remaining || 0,
           canGenerate: articleCheck.allowed,

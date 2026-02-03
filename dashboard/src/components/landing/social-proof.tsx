@@ -1,5 +1,6 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Award } from "lucide-react";
 import { unstable_noStore as noStore } from "next/cache";
+import Link from "next/link";
 
 interface SocialProofWebsite {
   id: string;
@@ -122,6 +123,36 @@ export async function SocialProof() {
               <p className="text-xs text-landing-text-muted">{stat.label}</p>
             </div>
           ))}
+        </div>
+
+        {/* Vercel Case Study Reference */}
+        <div className="mt-10 pt-8 border-t border-landing-border">
+          <Link
+            href="https://vercel.com/customers/nextjs-seo-playbook"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center justify-center gap-3 p-4 bg-landing-card border border-landing-border rounded-md hover:border-landing-accent/30 hover:bg-landing-card-hover transition-all max-w-xl mx-auto"
+          >
+            <div className="flex items-center gap-2">
+              <Award size={16} className="text-landing-accent" />
+              <span className="text-xs uppercase tracking-wider text-landing-accent font-medium">
+                Methodology
+              </span>
+            </div>
+            <div className="h-4 w-px bg-landing-border" />
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4" viewBox="0 0 76 65" fill="currentColor">
+                <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+              </svg>
+              <span className="text-sm text-landing-text group-hover:text-landing-accent transition-colors">
+                Built on the Next.js SEO Playbook
+              </span>
+              <ExternalLink size={12} className="text-landing-text-muted group-hover:text-landing-accent transition-colors" />
+            </div>
+          </Link>
+          <p className="text-xs text-landing-text-muted text-center mt-3">
+            Following the same SEO strategies that power Vercel's top-ranking content
+          </p>
         </div>
       </div>
     </section>
