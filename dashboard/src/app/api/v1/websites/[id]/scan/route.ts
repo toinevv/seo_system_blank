@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   extractApiKey,
   validatePlatformApiKey,
@@ -6,6 +6,34 @@ import {
   apiError,
   ApiErrors,
 } from "@/lib/api-auth";
+
+/**
+ * Helper to authenticate request (supports both session and API key)
+ */
+async function authenticateRequest(request: Request): Promise<{ userId: string | null; error?: string }> {
+  // Try API key first
+  const apiKey = extractApiKey(request);
+  if (apiKey) {
+    const auth = await validatePlatformApiKey(apiKey);
+    if (auth.valid && auth.userId) {
+      return { userId: auth.userId };
+    }
+    return { userId: null, error: auth.error };
+  }
+
+  // Fall back to session auth
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      return { userId: user.id };
+    }
+  } catch {
+    // Session auth failed
+  }
+
+  return { userId: null, error: "Authentication required" };
+}
 
 /**
  * GET /api/v1/websites/:id/scan
@@ -18,15 +46,10 @@ export async function GET(
   try {
     const { id } = await params;
 
-    // Validate API key
-    const apiKey = extractApiKey(request);
-    if (!apiKey) {
-      return ApiErrors.UNAUTHORIZED();
-    }
-
-    const auth = await validatePlatformApiKey(apiKey);
-    if (!auth.valid) {
-      return ApiErrors.INVALID_API_KEY(auth.error);
+    // Authenticate (supports both API key and session)
+    const auth = await authenticateRequest(request);
+    if (!auth.userId) {
+      return ApiErrors.UNAUTHORIZED(auth.error);
     }
 
     const supabase = createAdminClient();
@@ -77,15 +100,10 @@ export async function POST(
   try {
     const { id } = await params;
 
-    // Validate API key
-    const apiKey = extractApiKey(request);
-    if (!apiKey) {
-      return ApiErrors.UNAUTHORIZED();
-    }
-
-    const auth = await validatePlatformApiKey(apiKey);
-    if (!auth.valid) {
-      return ApiErrors.INVALID_API_KEY(auth.error);
+    // Authenticate (supports both API key and session)
+    const auth = await authenticateRequest(request);
+    if (!auth.userId) {
+      return ApiErrors.UNAUTHORIZED(auth.error);
     }
 
     const supabase = createAdminClient();
