@@ -92,31 +92,46 @@ export async function POST(
       });
     }
 
-    // Mark onboarding as started
+    // Check if we already have scan data (from preview scan during website creation)
+    const hasScanData = !!seoConfig.niche_description || !!seoConfig.main_keywords;
+
+    // If preview scan data exists, skip directly to discovering phase
+    const startingStatus = hasScanData ? "discovering" : "scanning";
+
     await supabase
       .from("websites")
       .update({
         seo_config: {
           ...seoConfig,
-          onboarding_status: "scanning",
+          onboarding_status: startingStatus,
           onboarding_started_at: new Date().toISOString(),
+          ...(hasScanData && { discovery_started_at: new Date().toISOString() }),
         },
       })
       .eq("id", id);
 
-    // Trigger scan asynchronously (don't await - let GET endpoint poll for completion)
+    // If we have scan data, trigger initial topic discovery right away
     const workerUrl = process.env.WORKER_URL || "https://seo-content-generator.ta-voeten.workers.dev";
-    if (workerUrl) {
-      // Fire and forget - scan runs in background
-      fetch(`${workerUrl}/scan?website_id=${id}`, {
-        method: "POST",
-      }).catch(err => console.error("Onboard scan trigger error:", err));
+    if (hasScanData && workerUrl) {
+      try {
+        const discoverUrl = `${workerUrl}/discover-topics?website_id=${id}&count=10`;
+        console.log(`[onboard POST] Triggering initial topic discovery: ${discoverUrl}`);
+        const response = await fetch(discoverUrl, { method: "POST" });
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`[onboard POST] Initial discovery result:`, result);
+        }
+      } catch (err) {
+        console.error(`[onboard POST] Initial discovery failed:`, err);
+      }
     }
 
     return apiSuccess({
       website_id: id,
-      status: "scanning",
-      message: "Onboarding started. Poll GET /api/v1/websites/:id/onboard for status.",
+      status: startingStatus,
+      message: hasScanData
+        ? "Scan data found, discovering topics. Poll GET for status."
+        : "Onboarding started. Poll GET for status.",
     });
   } catch (error) {
     console.error("Error in POST /api/v1/websites/:id/onboard:", error);
@@ -213,6 +228,7 @@ export async function GET(
       }
 
       if (hasScanData) {
+        const now = new Date().toISOString();
         // Scan complete! Move to discovering phase
         await supabase
           .from("websites")
@@ -220,7 +236,8 @@ export async function GET(
             seo_config: {
               ...scanContext,
               onboarding_status: "discovering",
-              discovery_started_at: new Date().toISOString(),
+              discovery_started_at: now,
+              last_discovery_triggered_at: now, // For idempotency
             },
           })
           .eq("id", id);
@@ -229,16 +246,16 @@ export async function GET(
         if (workerUrl) {
           try {
             const discoverUrl = `${workerUrl}/discover-topics?website_id=${id}&count=10`;
-            console.log(`[onboard] Triggering initial topic discovery: ${discoverUrl}`);
+            console.log(`[onboard GET] Triggering initial topic discovery: ${discoverUrl}`);
             const response = await fetch(discoverUrl, { method: "POST" });
             if (response.ok) {
               const result = await response.json();
-              console.log(`[onboard] Initial topic discovery result:`, result);
+              console.log(`[onboard GET] Initial topic discovery result:`, result);
             } else {
-              console.error(`[onboard] Topic discovery HTTP error:`, response.status);
+              console.error(`[onboard GET] Topic discovery HTTP error:`, response.status);
             }
           } catch (err) {
-            console.error(`[onboard] Topic discovery failed:`, err);
+            console.error(`[onboard GET] Topic discovery failed:`, err);
           }
         }
 
@@ -267,8 +284,26 @@ export async function GET(
 
       const hasEnoughTopics = (topicsCount || 0) >= 10; // Consider done if at least 10
 
-      // If not enough topics yet, trigger another batch (each poll makes progress)
-      if (!hasEnoughTopics && workerUrl) {
+      // Idempotency: Check if discovery was triggered recently (within 30s)
+      const lastDiscoveryTrigger = seoConfig.last_discovery_triggered_at as string;
+      const timeSinceLastTrigger = lastDiscoveryTrigger
+        ? Date.now() - new Date(lastDiscoveryTrigger).getTime()
+        : Infinity;
+      const shouldTriggerDiscovery = !hasEnoughTopics && timeSinceLastTrigger > 30000;
+
+      // If not enough topics yet and no recent trigger, discover more
+      if (shouldTriggerDiscovery && workerUrl) {
+        // Update trigger timestamp BEFORE calling worker (prevents race)
+        await supabase
+          .from("websites")
+          .update({
+            seo_config: {
+              ...seoConfig,
+              last_discovery_triggered_at: new Date().toISOString(),
+            },
+          })
+          .eq("id", id);
+
         try {
           const discoverUrl = `${workerUrl}/discover-topics?website_id=${id}&count=10`;
           console.log(`[onboard] Discovering more topics (current: ${topicsCount}): ${discoverUrl}`);
@@ -280,6 +315,8 @@ export async function GET(
         } catch (err) {
           console.error(`[onboard] Additional topic discovery failed:`, err);
         }
+      } else if (!hasEnoughTopics) {
+        console.log(`[onboard] Skipping discovery trigger (recent: ${Math.round(timeSinceLastTrigger/1000)}s ago)`);
       }
 
       if (hasEnoughTopics) {

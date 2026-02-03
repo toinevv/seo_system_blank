@@ -55,8 +55,16 @@ export function OnboardingProgress({ websiteId, onComplete }: OnboardingProgress
   const [state, setState] = useState<OnboardingState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(true);
+  const [isPollInFlight, setIsPollInFlight] = useState(false);
 
   const pollStatus = useCallback(async () => {
+    // Prevent concurrent polls - discovery can take 5-10 seconds
+    if (isPollInFlight) {
+      console.log("[onboarding] Skipping poll - previous request still in flight");
+      return;
+    }
+
+    setIsPollInFlight(true);
     try {
       const response = await fetch(`/api/v1/websites/${websiteId}/onboard`);
       const result = await response.json();
@@ -79,8 +87,10 @@ export function OnboardingProgress({ websiteId, onComplete }: OnboardingProgress
     } catch (err) {
       console.error("Polling error:", err);
       setError("Connection error");
+    } finally {
+      setIsPollInFlight(false);
     }
-  }, [websiteId, onComplete]);
+  }, [websiteId, onComplete, isPollInFlight]);
 
   useEffect(() => {
     if (!isPolling) return;
@@ -88,8 +98,8 @@ export function OnboardingProgress({ websiteId, onComplete }: OnboardingProgress
     // Initial poll
     pollStatus();
 
-    // Poll every 3 seconds
-    const interval = setInterval(pollStatus, 3000);
+    // Poll every 5 seconds (increased from 3 - discovery takes time)
+    const interval = setInterval(pollStatus, 5000);
 
     return () => clearInterval(interval);
   }, [isPolling, pollStatus]);
