@@ -238,3 +238,37 @@ export interface SystemKey {
   created_at: string;
   updated_at: string;
 }
+
+// =============================================
+// PARTNER BACKLINKING
+// =============================================
+
+export interface WebsitePartner {
+  id: string;
+  website_id: string;
+  partner_name: string;
+  partner_domain: string;
+  target_urls: PartnerTargetUrl[];
+  link_categories: string[];
+  max_links_per_article: number;
+  link_placement: "beginning" | "middle" | "end" | "natural";
+  is_active: boolean;
+  priority: number;
+  total_links_generated: number;
+  last_linked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PartnerTargetUrl {
+  url: string;
+  anchors: string[];
+}
+
+export interface Backlink {
+  url: string;
+  anchor_text: string;
+  partner_name: string;
+  partner_domain: string;
+  inserted_at: string;
+}

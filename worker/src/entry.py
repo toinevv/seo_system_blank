@@ -618,6 +618,34 @@ class Default(WorkerEntrypoint):
 
         article = self.optimize_seo(article, website)
 
+        # =============================================
+        # PARTNER BACKLINKING (optional feature)
+        # Fetches partners, selects relevant backlinks, and inserts into content
+        # Fails silently if migration not run - never breaks article generation
+        # =============================================
+        partners = await self._fetch_partners(website_id, supabase_url, supabase_key)
+        if partners:
+            backlinks = self._select_backlinks(article, partners)
+            if backlinks:
+                console.log(f"Inserting {len(backlinks)} backlinks into article")
+                article["content"] = self._insert_backlinks(
+                    article.get("content", ""),
+                    backlinks,
+                    website.get("language", "en-US")
+                )
+                # Store backlinks for tracking (separate from content)
+                article["backlinks"] = [{
+                    "url": b["url"],
+                    "anchor_text": b["anchor_text"],
+                    "partner_name": b["partner_name"],
+                    "partner_domain": b["partner_domain"],
+                    "inserted_at": datetime.now().isoformat()
+                } for b in backlinks]
+                # Save partner IDs for stats update after successful save
+                article["_partner_ids"] = [b["partner_id"] for b in backlinks if b.get("partner_id")]
+        else:
+            article["backlinks"] = []
+
         saved = await self.save_article(article, website, target_url, target_key)
 
         if not saved:
@@ -636,6 +664,12 @@ class Default(WorkerEntrypoint):
 
         # Mark topic as used (with times_used increment)
         await self.mark_topic_used(topic.get("id"), website, supabase_url, supabase_key)
+
+        # Update partner backlink stats (if any backlinks were inserted)
+        partner_ids = article.get("_partner_ids", [])
+        if partner_ids:
+            await self._update_partner_stats(partner_ids, supabase_url, supabase_key)
+            console.log(f"Updated stats for {len(partner_ids)} partner(s)")
 
         # Update schedule with time variation, format tracking, and API rotation
         await self.update_website_schedule(
@@ -1970,6 +2004,309 @@ Writing rules:
 
         return round(relevance, 2)
 
+    # =============================================
+    # PARTNER BACKLINKING
+    # =============================================
+
+    async def _fetch_partners(self, website_id: str, supabase_url: str, supabase_key: str) -> list:
+        """Fetch active partners for backlinking from the central platform database.
+
+        Returns empty list if:
+        - Table doesn't exist (migration not run)
+        - No partners configured
+        - Any fetch error (fail silently - never break article generation)
+        """
+        try:
+            headers = {
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}",
+                "Content-Type": "application/json"
+            }
+
+            # Fetch active partners ordered by priority
+            response = await fetch(
+                f"{supabase_url}/rest/v1/website_partners"
+                f"?website_id=eq.{website_id}"
+                f"&is_active=eq.true"
+                f"&order=priority.desc",
+                self._make_options("GET", headers)
+            )
+
+            if response.ok:
+                partners = await self._parse_json(response)
+                console.log(f"Fetched {len(partners)} active partners for backlinking")
+                return partners
+
+            # Table doesn't exist or other error - fail silently
+            error_text = await response.text()
+            if "42P01" in error_text or "does not exist" in error_text:
+                console.log("website_partners table not found - skipping backlinks (migration not run)")
+                return []
+
+            console.log(f"Partner fetch warning: {error_text[:100]}")
+            return []
+
+        except Exception as e:
+            console.log(f"Partner fetch failed silently: {str(e)}")
+            return []
+
+    def _select_backlinks(self, article: dict, partners: list) -> list:
+        """Select relevant backlinks from partners based on article category.
+
+        Returns list of backlinks with:
+        - url: Full URL with domain
+        - anchor_text: Selected anchor text
+        - partner_name: Partner name for tracking
+        - partner_domain: Domain for tracking
+        - placement: Where to insert (beginning/middle/end/natural)
+        - partner_id: For updating stats after save
+        """
+        if not partners:
+            return []
+
+        category = (article.get("category") or "").lower()
+        content_lower = article.get("content", "").lower()
+        backlinks = []
+
+        for partner in partners:
+            # Check category relevance
+            link_categories = [c.lower() for c in partner.get("link_categories", [])]
+            if link_categories and category and category not in link_categories:
+                # Partner has specific categories configured but article doesn't match
+                continue
+
+            # Get target URLs from partner
+            target_urls = partner.get("target_urls", [])
+            if not target_urls:
+                continue
+
+            # Find best URL/anchor combo based on content relevance
+            best_match = self._find_best_anchor(content_lower, target_urls)
+            if not best_match:
+                continue
+
+            partner_domain = partner.get("partner_domain", "")
+            backlink_url = best_match.get("url", "/")
+
+            # Ensure proper URL format
+            if not backlink_url.startswith("http"):
+                backlink_url = f"https://{partner_domain}{backlink_url}"
+            elif partner_domain not in backlink_url:
+                backlink_url = f"https://{partner_domain}{backlink_url}"
+
+            backlinks.append({
+                "url": backlink_url,
+                "anchor_text": best_match.get("anchor", partner.get("partner_name", "here")),
+                "partner_name": partner.get("partner_name", ""),
+                "partner_domain": partner_domain,
+                "placement": partner.get("link_placement", "natural"),
+                "partner_id": partner.get("id")
+            })
+
+            # Respect max_links_per_article per partner
+            max_links = partner.get("max_links_per_article", 1)
+            partner_links_count = sum(1 for b in backlinks if b["partner_id"] == partner.get("id"))
+            if partner_links_count >= max_links:
+                continue
+
+        # Global limit: max 3 backlinks per article
+        return backlinks[:3]
+
+    def _find_best_anchor(self, content: str, target_urls: list) -> Optional[dict]:
+        """Find the best target URL and anchor text based on content relevance."""
+        if not target_urls:
+            return None
+
+        best_score = 0
+        best_match = None
+
+        for target in target_urls:
+            url = target.get("url", "/")
+            anchors = target.get("anchors", [])
+
+            for anchor in anchors:
+                if not anchor:
+                    continue
+
+                # Score based on content relevance
+                score = 0
+                anchor_lower = anchor.lower()
+
+                # Exact phrase match
+                if anchor_lower in content:
+                    score += 10
+
+                # Word-level matching
+                words = [w for w in anchor_lower.split() if len(w) > 3]
+                word_matches = sum(1 for w in words if w in content)
+                score += word_matches * 2
+
+                if score > best_score:
+                    best_score = score
+                    best_match = {"url": url, "anchor": anchor}
+
+        # If no content-based match found, use first available
+        if not best_match and target_urls:
+            first_target = target_urls[0]
+            first_anchor = (first_target.get("anchors") or [""])[0]
+            if first_anchor:
+                best_match = {"url": first_target.get("url", "/"), "anchor": first_anchor}
+
+        return best_match
+
+    def _insert_backlinks(self, content: str, backlinks: list, language: str = "en-US") -> str:
+        """Insert backlinks into article content at appropriate positions.
+
+        Inserts contextual sentences with backlinks based on placement preference.
+        """
+        if not backlinks:
+            return content
+
+        import re
+
+        # Split content by closing paragraph tags
+        paragraphs = re.split(r'(</p>)', content)
+
+        for backlink in backlinks:
+            placement = backlink.get("placement", "natural")
+            anchor_text = backlink.get("anchor_text", "here")
+            url = backlink.get("url", "#")
+
+            # Create the link HTML
+            link_html = f'<a href="{url}" target="_blank" rel="noopener">{anchor_text}</a>'
+
+            # Determine insert position based on placement
+            total_paragraphs = len([p for p in paragraphs if '</p>' not in p and p.strip()])
+
+            if placement == "beginning":
+                insert_idx = max(2, total_paragraphs // 6)  # After intro
+            elif placement == "end":
+                insert_idx = total_paragraphs * 5 // 6  # Before conclusion
+            elif placement == "middle":
+                insert_idx = total_paragraphs // 2
+            else:  # natural - find relevant position
+                insert_idx = self._find_natural_position(paragraphs, anchor_text)
+
+            # Generate contextual sentence for the backlink
+            context_sentence = self._generate_link_context(backlink, language)
+            full_insert = f"<p>{context_sentence.replace('[LINK]', link_html)}</p>"
+
+            # Find actual position in split array (every other element is </p>)
+            actual_idx = min(insert_idx * 2, len(paragraphs) - 2)
+            if actual_idx >= 0 and actual_idx < len(paragraphs):
+                paragraphs[actual_idx] = paragraphs[actual_idx] + full_insert
+
+        return "".join(paragraphs)
+
+    def _find_natural_position(self, paragraphs: list, anchor_text: str) -> int:
+        """Find a natural position to insert a backlink based on anchor relevance."""
+        if not anchor_text:
+            return len(paragraphs) // 2
+
+        anchor_words = [w.lower() for w in anchor_text.split() if len(w) > 3]
+
+        best_idx = len(paragraphs) // 2  # Default to middle
+        best_score = 0
+
+        for i, para in enumerate(paragraphs):
+            if '</p>' in para or not para.strip():
+                continue
+
+            para_lower = para.lower()
+            score = sum(1 for word in anchor_words if word in para_lower)
+
+            if score > best_score:
+                best_score = score
+                best_idx = i // 2  # Convert to paragraph index
+
+        return best_idx
+
+    def _generate_link_context(self, backlink: dict, language: str) -> str:
+        """Generate a natural contextual sentence for a backlink.
+
+        Returns sentence with [LINK] placeholder for the actual link.
+        """
+        import random
+
+        partner_name = backlink.get("partner_name", "")
+
+        # Templates by language
+        if language.startswith("nl"):
+            templates = [
+                "Voor meer informatie kun je terecht bij [LINK].",
+                "Bekijk ook [LINK] voor aanvullende inzichten.",
+                "Wil je meer weten? Lees verder op [LINK].",
+                f"De experts van {partner_name} delen meer hierover op [LINK]." if partner_name else "Lees meer op [LINK].",
+                "Je vindt aanvullende informatie op [LINK].",
+            ]
+        elif language.startswith("de"):
+            templates = [
+                "Weitere Informationen finden Sie bei [LINK].",
+                "Erfahren Sie mehr auf [LINK].",
+                f"Die Experten von {partner_name} teilen mehr dazu auf [LINK]." if partner_name else "Lesen Sie mehr auf [LINK].",
+            ]
+        elif language.startswith("fr"):
+            templates = [
+                "Pour plus d'informations, consultez [LINK].",
+                "Découvrez-en plus sur [LINK].",
+                f"Les experts de {partner_name} partagent plus sur [LINK]." if partner_name else "En savoir plus sur [LINK].",
+            ]
+        else:  # Default to English
+            templates = [
+                "For more information, check out [LINK].",
+                "You might also find [LINK] helpful.",
+                "Learn more at [LINK].",
+                f"The experts at {partner_name} share more about this at [LINK]." if partner_name else "Read more at [LINK].",
+                "For additional insights, visit [LINK].",
+            ]
+
+        return random.choice(templates)
+
+    async def _update_partner_stats(self, partner_ids: list, supabase_url: str, supabase_key: str):
+        """Update total_links_generated for partners after successful article save."""
+        if not partner_ids:
+            return
+
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json"
+        }
+
+        for partner_id in partner_ids:
+            if not partner_id:
+                continue
+
+            try:
+                # Use RPC function if available, otherwise direct update
+                response = await fetch(
+                    f"{supabase_url}/rest/v1/rpc/increment_partner_link_count",
+                    self._make_options("POST", headers, json.dumps({"partner_id": partner_id}))
+                )
+
+                if not response.ok:
+                    # Fallback: direct update (less atomic but works)
+                    # First fetch current count
+                    get_response = await fetch(
+                        f"{supabase_url}/rest/v1/website_partners?id=eq.{partner_id}&select=total_links_generated",
+                        self._make_options("GET", headers)
+                    )
+
+                    if get_response.ok:
+                        data = await self._parse_json(get_response)
+                        if data:
+                            current_count = data[0].get("total_links_generated", 0)
+                            update_data = {
+                                "total_links_generated": current_count + 1,
+                                "last_linked_at": datetime.now().isoformat()
+                            }
+                            await fetch(
+                                f"{supabase_url}/rest/v1/website_partners?id=eq.{partner_id}",
+                                self._make_options("PATCH", headers, json.dumps(update_data))
+                            )
+            except Exception as e:
+                console.log(f"Failed to update partner stats for {partner_id}: {str(e)}")
+
     def parse_article(self, content: str, topic: dict, website: dict) -> dict:
         """Parse AI response into article structure with full GEO optimization.
 
@@ -2327,6 +2664,9 @@ Writing rules:
             # Schema and internal links
             "internal_links": article.get("internal_links", []),
             "schema_markup": article.get("schema_markup", {}),
+
+            # Partner backlinks (stores which partner links were inserted)
+            "backlinks": article.get("backlinks", []),
         }
 
         # Start with all fields

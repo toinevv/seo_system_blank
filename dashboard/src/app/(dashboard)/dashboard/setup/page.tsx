@@ -6,33 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Copy, Check, Terminal, Bot, Sparkles, Loader2, ArrowRight, Cloud, Database, Zap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import { BLOG_ARTICLES_SQL } from "@/lib/constants/sql-schema";
 
-// SQL for blog_articles table
-const BLOG_SQL = `CREATE TABLE IF NOT EXISTS public.blog_articles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug TEXT NOT NULL,
-  product_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  excerpt TEXT,
-  meta_description TEXT,
-  cover_image_url TEXT,
-  tags TEXT[] DEFAULT ARRAY[]::TEXT[],
-  published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  status TEXT DEFAULT 'published',
-  author TEXT,
-  tldr TEXT,
-  faq_items JSONB DEFAULT '[]'::JSONB,
-  CONSTRAINT blog_articles_slug_product_unique UNIQUE(slug, product_id)
-);
-
-ALTER TABLE public.blog_articles ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Public can read published"
-  ON public.blog_articles FOR SELECT
-  USING (status = 'published');
-
-GRANT SELECT ON public.blog_articles TO anon;`;
+// Use centralized SQL schema (single source of truth)
+const BLOG_SQL = BLOG_ARTICLES_SQL;
 
 // CLI command template
 const getCommand = (apiKey: string, domain: string) =>

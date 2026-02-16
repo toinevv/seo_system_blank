@@ -17,6 +17,7 @@ import {
   Search,
   Tag,
   Key,
+  Link2,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -212,6 +213,18 @@ export default async function WebsiteDetailPage({ params, searchParams }: Props)
                 <CardTitle className="text-base">Logs</CardTitle>
                 <CardDescription>
                   View generation history and errors
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+
+          <Link href={`/dashboard/websites/${id}/partners`}>
+            <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <Link2 className="h-8 w-8 text-primary mb-2" />
+                <CardTitle className="text-base">Partners</CardTitle>
+                <CardDescription>
+                  Manage partner websites for backlinking
                 </CardDescription>
               </CardHeader>
             </Card>
