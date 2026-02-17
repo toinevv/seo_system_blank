@@ -128,23 +128,56 @@ ALTER TABLE public.blog_articles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public can read published" ON public.blog_articles FOR SELECT USING (status = 'published');
 GRANT SELECT ON public.blog_articles TO anon;`;
 
-// Vibe coder prompt that references the dashboard
+// Vibe coder prompt with embedded SQL (self-contained for AI platforms)
 export const VIBE_CODER_PROMPT = `Add IndexYourNiche SEO blog to this project.
 
 ## Step 1: Create Articles Table
-Run the full SQL schema from IndexYourNiche dashboard (Setup → Copy SQL).
-The minimal required columns are: id, slug, product_id, website_domain, title, content, status, published_at.
+Run this SQL in your Supabase SQL Editor:
+
+\`\`\`sql
+CREATE TABLE IF NOT EXISTS public.blog_articles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  website_domain TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  excerpt TEXT,
+  meta_description TEXT,
+  tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+  published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  status TEXT DEFAULT 'published',
+  author TEXT,
+  category TEXT,
+  -- GEO fields (for AI search optimization)
+  tldr TEXT,
+  faq_items JSONB DEFAULT '[]'::JSONB,
+  citations JSONB DEFAULT '[]'::JSONB,
+  cited_statistics JSONB DEFAULT '[]'::JSONB,
+  faq_schema JSONB DEFAULT '{}'::JSONB,
+  geo_optimized BOOLEAN DEFAULT FALSE,
+  -- Partner backlinks
+  backlinks JSONB DEFAULT '[]'::JSONB,
+  CONSTRAINT blog_articles_slug_product_unique UNIQUE(slug, product_id)
+);
+
+ALTER TABLE public.blog_articles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public can read published" ON public.blog_articles FOR SELECT USING (status = 'published');
+GRANT SELECT ON public.blog_articles TO anon;
+\`\`\`
 
 ## Step 2: Build Blog Frontend
 Create app/blog/page.tsx (list articles) and app/blog/[slug]/page.tsx (single article).
 Fetch from Supabase, add SEO meta tags and JSON-LD schema.
 
 Example query:
+\`\`\`typescript
 const { data } = await supabase
   .from('blog_articles')
   .select('*')
   .eq('status', 'published')
   .order('published_at', { ascending: false });
+\`\`\`
 
 Done! Articles will appear in your database automatically.`;
 
