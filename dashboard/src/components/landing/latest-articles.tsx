@@ -4,7 +4,7 @@ import { ArrowRight, Newspaper } from "lucide-react";
 import { BlogCard, BlogArticle } from "./blog-card";
 
 // Product ID for IndexYourNiche articles
-const PRODUCT_ID = "indexyourniche-com";
+const PRODUCT_ID = "indexyourniche";
 
 async function getLatestArticles(): Promise<BlogArticle[]> {
   // Skip during build time when env vars aren't available

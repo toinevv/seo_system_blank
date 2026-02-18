@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 // Product ID for IndexYourNiche articles
-const PRODUCT_ID = "indexyourniche-com";
+const PRODUCT_ID = "indexyourniche";
 
 async function getBlogArticles(): Promise<BlogArticle[]> {
   // Skip during build time when env vars aren't available

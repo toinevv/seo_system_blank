@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 // Product ID for IndexYourNiche articles
-const PRODUCT_ID = "indexyourniche-com";
+const PRODUCT_ID = "indexyourniche";
 const SITE_URL = "https://indexyourniche.com";
 
 interface FaqItem {
