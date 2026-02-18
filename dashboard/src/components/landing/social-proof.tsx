@@ -1,4 +1,4 @@
-import { ExternalLink, Award } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { unstable_noStore as noStore } from "next/cache";
 import Link from "next/link";
 
@@ -125,33 +125,88 @@ export async function SocialProof() {
           ))}
         </div>
 
-        {/* Vercel Case Study Reference */}
+        {/* Integrations */}
         <div className="mt-10 pt-8 border-t border-landing-border">
-          <Link
-            href="https://vercel.com/customers/nextjs-seo-playbook"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center justify-center gap-3 p-4 bg-landing-card border border-landing-border rounded-md hover:border-landing-accent/30 hover:bg-landing-card-hover transition-all max-w-xl mx-auto"
-          >
-            <div className="flex items-center gap-2">
-              <Award size={16} className="text-landing-accent" />
-              <span className="text-xs uppercase tracking-wider text-landing-accent font-medium">
-                Methodology
+          <p className="text-xs uppercase tracking-widest text-landing-text-muted text-center mb-4">
+            Integrates With
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3 max-w-2xl mx-auto">
+            {/* Supabase */}
+            <Link
+              href="https://supabase.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2 px-4 py-3 bg-landing-card border border-landing-border rounded-md hover:border-landing-accent/30 hover:bg-landing-card-hover transition-all"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 109 113" fill="none">
+                <path d="M63.7076 110.284C60.8481 113.885 55.0502 111.912 54.9813 107.314L53.9738 40.0627L99.1935 40.0627C107.384 40.0627 111.952 49.5228 106.859 55.9374L63.7076 110.284Z" fill="url(#paint0_linear)" />
+                <path d="M63.7076 110.284C60.8481 113.885 55.0502 111.912 54.9813 107.314L53.9738 40.0627L99.1935 40.0627C107.384 40.0627 111.952 49.5228 106.859 55.9374L63.7076 110.284Z" fill="url(#paint1_linear)" fillOpacity="0.2" />
+                <path d="M45.317 2.07103C48.1765 -1.53037 53.9745 0.442937 54.0434 5.041L54.4849 72.2922H9.83113C1.64038 72.2922 -2.92775 62.8321 2.1655 56.4175L45.317 2.07103Z" fill="#3ECF8E" />
+                <defs>
+                  <linearGradient id="paint0_linear" x1="53.9738" y1="54.974" x2="94.1635" y2="71.8295" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#249361" />
+                    <stop offset="1" stopColor="#3ECF8E" />
+                  </linearGradient>
+                  <linearGradient id="paint1_linear" x1="36.1558" y1="30.578" x2="54.4844" y2="65.0806" gradientUnits="userSpaceOnUse">
+                    <stop />
+                    <stop offset="1" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <span className="text-sm text-landing-text group-hover:text-landing-accent transition-colors">
+                Supabase
               </span>
-            </div>
-            <div className="h-4 w-px bg-landing-border" />
-            <div className="flex items-center gap-2">
+            </Link>
+
+            {/* Vercel */}
+            <Link
+              href="https://vercel.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2 px-4 py-3 bg-landing-card border border-landing-border rounded-md hover:border-landing-accent/30 hover:bg-landing-card-hover transition-all"
+            >
               <svg className="w-4 h-4" viewBox="0 0 76 65" fill="currentColor">
                 <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
               </svg>
               <span className="text-sm text-landing-text group-hover:text-landing-accent transition-colors">
-                Built on the Next.js SEO Playbook
+                Vercel
               </span>
-              <ExternalLink size={12} className="text-landing-text-muted group-hover:text-landing-accent transition-colors" />
-            </div>
-          </Link>
-          <p className="text-xs text-landing-text-muted text-center mt-3">
-            Following the same SEO strategies that power Vercel's top-ranking content
+            </Link>
+
+            {/* Cloudflare */}
+            <Link
+              href="https://cloudflare.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2 px-4 py-3 bg-landing-card border border-landing-border rounded-md hover:border-landing-accent/30 hover:bg-landing-card-hover transition-all"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 65 65" fill="none">
+                <path d="M43.6 43.8H21.3c-.4 0-.7-.2-.8-.5-.1-.3 0-.7.3-.9l7-5.7c.2-.1.4-.2.6-.2h11.7c.9 0 1.7-.6 1.9-1.5l1.8-6.8c.1-.4.1-.8-.1-1.2-.2-.3-.5-.6-.9-.7l-5.5-1.6c-.4-.1-.6-.5-.5-.9.1-.4.5-.6.9-.5l5.5 1.6c.8.2 1.4.7 1.8 1.4.4.7.5 1.5.3 2.3l-1.8 6.8c-.4 1.6-1.9 2.8-3.6 2.8H29.1l-4.3 3.5h18.8c.5 0 .9.4.9.9s-.4 1.1-.9 1.2z" fill="#F6821F"/>
+                <path d="M48.5 43.8H43c-.5 0-.9-.4-.9-.9s.4-.9.9-.9h5.5c1.6 0 3-1.1 3.4-2.7l1.3-5c.1-.4.1-.8-.1-1.1-.2-.3-.5-.6-.8-.7L35 26.2c-.4-.1-.6-.5-.5-.9.1-.4.5-.6.9-.5l17.3 6.3c.7.3 1.3.8 1.6 1.4.3.7.4 1.4.2 2.1l-1.3 5c-.6 2.5-2.9 4.2-5.7 4.2z" fill="#FBAD41"/>
+              </svg>
+              <span className="text-sm text-landing-text group-hover:text-landing-accent transition-colors">
+                Cloudflare
+              </span>
+            </Link>
+
+            {/* Netlify */}
+            <Link
+              href="https://netlify.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2 px-4 py-3 bg-landing-card border border-landing-border rounded-md hover:border-landing-accent/30 hover:bg-landing-card-hover transition-all"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 256 256" fill="none">
+                <path d="M170.3 87.7l-45.4-45.4c-1.1-1.1-2.9-1.1-4 0l-45.4 45.4c-1.1 1.1-1.1 2.9 0 4l45.4 45.4c1.1 1.1 2.9 1.1 4 0l45.4-45.4c1.1-1.1 1.1-2.9 0-4z" fill="#05BDBA"/>
+                <path d="M127.9 137.1l45.4 45.4c1.1 1.1 1.1 2.9 0 4l-45.4 45.4c-1.1 1.1-2.9 1.1-4 0l-45.4-45.4c-1.1-1.1-1.1-2.9 0-4l45.4-45.4c1.1-1.1 2.9-1.1 4 0z" fill="#014847"/>
+              </svg>
+              <span className="text-sm text-landing-text group-hover:text-landing-accent transition-colors">
+                Netlify
+              </span>
+            </Link>
+          </div>
+          <p className="text-xs text-landing-text-muted text-center mt-4">
+            Works with any Postgres database • Deploy anywhere
           </p>
         </div>
       </div>

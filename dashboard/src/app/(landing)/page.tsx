@@ -1,6 +1,5 @@
 import { Hero } from "@/components/landing/hero";
 import { ProblemSection } from "@/components/landing/problem-section";
-import { Features } from "@/components/landing/features";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { SocialProof } from "@/components/landing/social-proof";
 import { LatestArticles } from "@/components/landing/latest-articles";
@@ -16,7 +15,6 @@ export default function LandingPage() {
     <>
       <Hero />
       <ProblemSection />
-      <Features />
       <HowItWorks />
       <SocialProof />
       <LatestArticles />
