@@ -92,11 +92,12 @@ const jsonLd = {
     highPrice: "99",
     offerCount: "3",
   },
-  aggregateRating: {
-    "@type": "AggregateRating",
-    ratingValue: "4.8",
-    ratingCount: "50",
-  },
+  // Note: Add aggregateRating once you have real reviews
+  // aggregateRating: {
+  //   "@type": "AggregateRating",
+  //   ratingValue: "4.8",
+  //   ratingCount: "50",
+  // },
   featureList: [
     "Supabase/Postgres Integration",
     "Automated Content Generation",
@@ -137,24 +138,28 @@ export default function LandingLayout({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
       />
 
-      {/* Google Analytics */}
-      <Script
-        src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"
-        strategy="afterInteractive"
-      />
-      <Script id="google-analytics" strategy="afterInteractive">
-        {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('consent', 'default', {
-            'analytics_storage': 'granted'
-          });
-          gtag('config', 'G-XXXXXXXXXX', {
-            page_path: window.location.pathname,
-          });
-        `}
-      </Script>
+      {/* Google Analytics - Add your GA4 ID via environment variable */}
+      {process.env.NEXT_PUBLIC_GA_ID && (
+        <>
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+            strategy="afterInteractive"
+          />
+          <Script id="google-analytics" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('consent', 'default', {
+                'analytics_storage': 'granted'
+              });
+              gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}', {
+                page_path: window.location.pathname,
+              });
+            `}
+          </Script>
+        </>
+      )}
 
       <LandingNav />
       <main>{children}</main>
