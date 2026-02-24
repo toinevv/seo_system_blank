@@ -4,34 +4,16 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Check, Copy, Terminal, Bot, Database, Zap, ChevronDown, ChevronUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BLOG_ARTICLES_SQL_MINIMAL } from "@/lib/constants/sql-schema";
 
 // Full prompt for AI agents (Lovable, Cursor, Bolt, Replit, etc.)
+// SQL is pulled from the centralized schema config
 const AI_PROMPT = `Add IndexYourNiche SEO blog to this project. This will automatically generate SEO-optimized articles written directly to your Supabase database.
 
 ## Step 1: Create Articles Table
 Run this SQL in your Supabase SQL Editor (Supabase Dashboard → SQL Editor):
 
-CREATE TABLE IF NOT EXISTS public.blog_articles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug TEXT NOT NULL,
-  product_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  excerpt TEXT,
-  meta_description TEXT,
-  cover_image_url TEXT,
-  tags TEXT[] DEFAULT ARRAY[]::TEXT[],
-  published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  status TEXT DEFAULT 'published',
-  author TEXT,
-  tldr TEXT,
-  faq_items JSONB DEFAULT '[]'::JSONB,
-  CONSTRAINT blog_articles_slug_product_unique UNIQUE(slug, product_id)
-);
-
-ALTER TABLE public.blog_articles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public can read published" ON public.blog_articles FOR SELECT USING (status = 'published');
-GRANT SELECT ON public.blog_articles TO anon;
+${BLOG_ARTICLES_SQL_MINIMAL}
 
 ## Step 2: Register at IndexYourNiche
 Go to https://indexyourniche.com/signup and:
