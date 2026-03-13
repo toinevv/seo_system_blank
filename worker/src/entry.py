@@ -2680,6 +2680,8 @@ Writing rules:
         }
 
         # Retry loop - removes missing columns and retries (max 5 retries)
+        # Also handles duplicate slugs by appending a unique suffix
+        original_slug = data["slug"]
         max_retries = 5
         for attempt in range(max_retries):
             try:
@@ -2703,6 +2705,15 @@ Writing rules:
                                 console.log(f"Removing missing column '{missing_col}' and retrying...")
                                 del data[missing_col]
                                 continue
+
+                    # Check if error is a duplicate slug (23505 unique constraint)
+                    if "23505" in error_text and "slug" in error_text:
+                        # Generate a unique suffix using timestamp
+                        timestamp_suffix = datetime.now().strftime("%Y%m%d%H%M")
+                        new_slug = f"{original_slug[:47]}-{timestamp_suffix}"
+                        data["slug"] = new_slug
+                        console.log(f"Duplicate slug detected, retrying with: {new_slug}")
+                        continue
 
                     console.log(f"Save article error: {error_text}")
                     return False
