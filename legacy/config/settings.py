@@ -86,7 +86,7 @@ API_CONFIG = {
         "presence_penalty": 0.3
     },
     "claude": {
-        "model": "claude-3-opus-20240229",
+        "model": "claude-sonnet-4-6",
         "temperature": 0.7,
         "max_tokens": 2500,
         "top_p": 0.9

@@ -1197,7 +1197,7 @@ Return ONLY a JSON object (no markdown):
             }
 
             body = json.dumps({
-                "model": "claude-sonnet-4-20250514",
+                "model": "claude-sonnet-4-6",
                 "max_tokens": 4000,
                 "system": system_prompt,
                 "messages": [

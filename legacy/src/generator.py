@@ -688,7 +688,7 @@ class ContentGenerator:
             try:
                 logger.info("🧪 Testing Claude connectivity...")
                 response = self.claude_client.messages.create(
-                    model="claude-3-haiku-20240307",  # Use cheaper model for testing
+                    model="claude-sonnet-4-6",
                     max_tokens=5,
                     messages=[{"role": "user", "content": "Test"}]
                 )

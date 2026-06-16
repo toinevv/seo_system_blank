@@ -387,7 +387,7 @@ Each website has its own Supabase with the `blog_articles` table:
 
 - **Trigger**: `0 * * * *` (every hour)
 - **Action**: Check for websites due for generation
-- **AI Models**: GPT-4o (gpt-4o), Claude Sonnet 4 (claude-sonnet-4-20250514)
+- **AI Models**: GPT-4o (gpt-4o), Claude Sonnet 4.6 (claude-sonnet-4-6)
 
 ### Recent Fixes
 
