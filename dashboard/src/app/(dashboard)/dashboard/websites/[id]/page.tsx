@@ -303,10 +303,22 @@ export default async function WebsiteDetailPage({ params, searchParams }: Props)
                 </div>
               </div>
             ) : websiteScan && websiteScan.scan_status === "scanning" ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                Scanning website content...
-              </div>
+              (() => {
+                const scanAge = websiteScan.updated_at
+                  ? Date.now() - new Date(websiteScan.updated_at).getTime()
+                  : Infinity;
+                const isStale = scanAge > 2 * 60 * 1000;
+                return isStale ? (
+                  <div className="text-sm text-yellow-600">
+                    Scan timed out. Click &quot;Scan Website&quot; to try again.
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    Scanning website content...
+                  </div>
+                );
+              })()
             ) : websiteScan && websiteScan.scan_status === "failed" ? (
               <div className="text-sm text-red-600">
                 Scan failed: {websiteScan.error_message || "Unknown error"}
