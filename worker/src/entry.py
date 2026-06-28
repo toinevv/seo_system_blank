@@ -3375,14 +3375,22 @@ Return ONLY valid JSON:
         await self.update_scan_status(website_id, "scanning", supabase_url, supabase_key)
 
         try:
-            # Fetch homepage
+            # Fetch homepage - strip www. from stored domain and try both variants
+            domain = re.sub(r'^https?://', '', domain).rstrip('/')
+            domain = re.sub(r'^www\.', '', domain)
             homepage_url = f"https://{domain}"
-            homepage_html = await self.fetch_page_content(homepage_url)
+            homepage_html = await self.fetch_page_content(homepage_url, timeout_ms=8000)
+
+            if not homepage_html:
+                # Try www. variant as fallback
+                console.log(f"Homepage failed, trying www.{domain}")
+                homepage_url = f"https://www.{domain}"
+                homepage_html = await self.fetch_page_content(homepage_url, timeout_ms=8000)
 
             if not homepage_html:
                 await self.update_scan_status(
                     website_id, "failed", supabase_url, supabase_key,
-                    error_message=f"Failed to fetch homepage: {homepage_url}"
+                    error_message=f"Failed to fetch homepage (tried with and without www)"
                 )
                 return False
 
@@ -3400,7 +3408,7 @@ Return ONLY valid JSON:
 
             for link in nav_links[:5]:
                 try:
-                    page_html = await self.fetch_page_content(link["url"])
+                    page_html = await self.fetch_page_content(link["url"], timeout_ms=5000)
                     if page_html:
                         page_data = self.extract_page_metadata(page_html, link["url"])
                         all_headings.extend(page_data.get("headings", []))
