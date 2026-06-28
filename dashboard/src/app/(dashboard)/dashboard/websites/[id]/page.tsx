@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ScanWebsiteButton } from "./scan-button";
 import { OnboardingProgressWrapper } from "./onboarding-wrapper";
+import { ManualScanInput } from "./manual-scan-input";
 
 import {
   Settings,
@@ -307,11 +308,9 @@ export default async function WebsiteDetailPage({ params, searchParams }: Props)
                 const scanAge = websiteScan.updated_at
                   ? Date.now() - new Date(websiteScan.updated_at).getTime()
                   : Infinity;
-                const isStale = scanAge > 2 * 60 * 1000;
+                const isStale = scanAge > 3 * 60 * 1000;
                 return isStale ? (
-                  <div className="text-sm text-yellow-600">
-                    Scan timed out. Click &quot;Scan Website&quot; to try again.
-                  </div>
+                  <ManualScanInput websiteId={id} />
                 ) : (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
