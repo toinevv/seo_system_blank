@@ -435,6 +435,19 @@ class Default(WorkerEntrypoint):
                     "Access-Control-Allow-Headers": "Content-Type, Authorization"
                 })
 
+            if "/analyze-text" in url:
+                body = await request.json()
+                website_id_body = body.get("website_id")
+                pages = body.get("pages", [])
+                if not website_id_body or not pages:
+                    return Response(json.dumps({"error": "website_id and pages required", "success": False}),
+                                    status=400, headers={"Content-Type": "application/json"})
+                result = await self.analyze_text_content(website_id_body, pages)
+                return Response(json.dumps(result), headers={
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                })
+
             if "/scan" in url:
                 # Support single-website scanning
                 if website_id:
@@ -3356,6 +3369,116 @@ Return ONLY valid JSON:
         except Exception as e:
             console.log(f"Single generate error: {str(e)}")
             return {"error": str(e), "success": False}
+
+    async def analyze_text_content(self, website_id: str, pages: list) -> dict:
+        """Analyze manually pasted page text and save as scan results."""
+        try:
+            supabase_url = getattr(self.env, "CENTRAL_SUPABASE_URL", None)
+            supabase_key = getattr(self.env, "CENTRAL_SUPABASE_SERVICE_KEY", None)
+            encryption_key = getattr(self.env, "ENCRYPTION_KEY", None)
+
+            if not all([supabase_url, supabase_key, encryption_key]):
+                return {"error": "Missing environment variables", "success": False}
+
+            # Get website details
+            url = f"{supabase_url}/rest/v1/websites?id=eq.{website_id}&select=*"
+            headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
+            response = await fetch(url, self._make_options("GET", headers))
+            websites = list(await self._parse_json(response))
+            if not websites:
+                return {"error": "Website not found", "success": False}
+            website = dict(websites[0])
+
+            # Get OpenAI key
+            api_keys = await self.get_api_keys(website_id, supabase_url, supabase_key)
+            openai_key = None
+            if api_keys and api_keys.get("openai_api_key_encrypted"):
+                openai_key = await self._decrypt(api_keys.get("openai_api_key_encrypted"), encryption_key)
+            if not openai_key:
+                openai_key = getattr(self.env, "PLATFORM_OPENAI_KEY", None)
+
+            await self.update_scan_status(website_id, "scanning", supabase_url, supabase_key)
+
+            # Combine all pasted page texts with labels
+            combined_text = "\n\n".join(
+                f"--- {p.get('label', 'Page')} ---\n{p.get('text', '').strip()}"
+                for p in pages if p.get("text", "").strip()
+            )
+
+            if not combined_text.strip():
+                await self.update_scan_status(website_id, "failed", supabase_url, supabase_key,
+                                              error_message="No text content provided")
+                return {"success": False, "error": "No text content provided"}
+
+            # AI analysis directly on raw text — skip keyword extraction
+            prompt = f"""Analyze this website's content (pasted directly by the website owner) and identify its niche, themes, and relevant keywords.
+
+WEBSITE: {website.get('domain')}
+NAME: {website.get('name')}
+
+PAGE CONTENT:
+{combined_text[:6000]}
+
+IMPORTANT: Based ONLY on the actual content above, determine:
+1. What is this website's specific niche? (Be precise)
+2. What are the main content themes?
+3. What keywords would be most relevant for blog topics?
+
+Return ONLY a JSON object (no markdown):
+{{
+    "niche_description": "A 1-2 sentence description of the website's specific niche and target audience",
+    "themes": ["theme1", "theme2", "theme3", "theme4", "theme5"],
+    "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6", "keyword7", "keyword8", "keyword9", "keyword10"],
+    "language": "detected language code (e.g., nl, en, de)"
+}}"""
+
+            ai_result = None
+            if openai_key:
+                ai_headers = {"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"}
+                body = json.dumps({
+                    "model": "gpt-4o",
+                    "messages": [
+                        {"role": "system", "content": "You are an SEO analyst. Analyze website content and identify its niche accurately. Return only valid JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 800,
+                    "temperature": 0.3
+                })
+                try:
+                    resp = await fetch("https://api.openai.com/v1/chat/completions",
+                                       self._make_options("POST", ai_headers, body))
+                    if resp.ok:
+                        data = await self._parse_json(resp)
+                        content = data["choices"][0]["message"]["content"].strip()
+                        if content.startswith("```"):
+                            content = content.split("```")[1]
+                            if content.startswith("json"):
+                                content = content[4:]
+                        ai_result = json.loads(content)
+                except Exception as e:
+                    console.log(f"AI analysis failed: {str(e)}")
+
+            scan_data = {
+                "niche_description": ai_result.get("niche_description") if ai_result else None,
+                "content_themes": ai_result.get("themes", []) if ai_result else [],
+                "main_keywords": ai_result.get("keywords", []) if ai_result else [],
+                "headings": [],
+                "navigation_links": [],
+                "pages_scanned": len(pages),
+                "scan_status": "completed",
+                "last_scanned_at": datetime.now().isoformat()
+            }
+
+            await self.save_scan_results(website_id, scan_data, supabase_url, supabase_key)
+            console.log(f"Text analysis completed for {website.get('domain')}")
+            return {"success": True, "data": scan_data}
+
+        except Exception as e:
+            console.log(f"analyze_text_content error: {str(e)}")
+            if supabase_url and supabase_key:
+                await self.update_scan_status(website_id, "failed", supabase_url, supabase_key,
+                                              error_message=str(e))
+            return {"success": False, "error": str(e)}
 
     async def scan_website(
         self,
